@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authRouter } from '../modules/auth/auth.routes';
+import { profileRouter } from '../modules/profile/profile.routes';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root API Router
@@ -11,6 +12,7 @@ const router = Router();
 
 // ── Feature Modules ───────────────────────────────────────────────────────────
 router.use('/auth', authRouter);
+router.use('/profile', profileRouter);
 
 // ── API Version Info ──────────────────────────────────────────────────────────
 router.get('/', (_req, res) => {
