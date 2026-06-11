@@ -1,15 +1,16 @@
 import { Router } from 'express';
+import { authRouter } from '../modules/auth/auth.routes';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root API Router
 // ─────────────────────────────────────────────────────────────────────────────
 // Import and mount feature module routers here as you build them.
-// Example:
-//   import { authRouter } from '../modules/auth/auth.routes';
-//   router.use('/auth', authRouter);
 // ─────────────────────────────────────────────────────────────────────────────
 
 const router = Router();
+
+// ── Feature Modules ───────────────────────────────────────────────────────────
+router.use('/auth', authRouter);
 
 // ── API Version Info ──────────────────────────────────────────────────────────
 router.get('/', (_req, res) => {

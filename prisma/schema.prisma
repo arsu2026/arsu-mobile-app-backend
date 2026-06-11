@@ -10,5 +10,21 @@ datasource db {
 }
 
 // ─────────────────────────────────────────────
-// Add your models below
+// Models
 // ─────────────────────────────────────────────
+
+/// One row of application profile data per Supabase Auth user.
+///
+/// `id` mirrors auth.users(id). That foreign key, plus Row Level Security
+/// and its policies, are defined as raw SQL inside the migration — Prisma
+/// does not own the `auth` schema and has no syntax for RLS, so those live
+/// in the migration file rather than here. See migrations/*_add_profiles.
+model Profile {
+  id        String   @id @db.Uuid
+  fullName  String?  @map("full_name")
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("profiles")
+}

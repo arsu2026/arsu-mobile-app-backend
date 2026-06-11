@@ -30,7 +30,7 @@ export const env = {
 
   // Database
   DATABASE_URL: requireEnv('DATABASE_URL'),
-  DIRECT_URL: requireEnv('DIRECT_URL'),
+  DATABASE_DIRECT_URL: requireEnv('DATABASE_DIRECT_URL'),
 
   // JWT
   JWT_SECRET: requireEnv('JWT_SECRET'),
