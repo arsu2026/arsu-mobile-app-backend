@@ -1,9 +1,10 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Load .env.local first (local dev), fall back to .env
-const envFile = process.env.NODE_ENV === 'test' ? '.env.test' : '.env.local';
-dotenv.config({ path: path.resolve(process.cwd(), envFile) });
+// Load variables from a single local .env file (gitignored). .env.example
+// documents the required variables. Tests don't depend on any file:
+// test/jest.setup-env.ts sets process.env before this runs, and dotenv never
+// overrides already-set variables, so the suite stays hermetic.
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 function requireEnv(key: string): string {
