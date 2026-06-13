@@ -82,6 +82,31 @@ enum NotificationType {
   @@map("notification_type")
 }
 
+enum ExploreCategory {
+  MUSIC
+  SPORTS
+  GAMING
+  EDUCATION
+  COMEDY
+  NEWS
+  TRAVEL
+  FOOD
+  TECH
+
+  @@map("explore_category")
+}
+
+enum SearchType {
+  ALL
+  USERS
+  POSTS
+  VIDEOS
+  SHORTS
+  HASHTAGS
+
+  @@map("search_type")
+}
+
 // ─────────────────────────────────────────────
 // Models
 // ─────────────────────────────────────────────
@@ -123,6 +148,9 @@ model Profile {
   actedNotifications Notification[]       @relation("NotificationActor")
   contacts        UserContact[]           @relation("ContactOwner")
   contactOf       UserContact[]           @relation("ContactUser")
+  accountSettings UserAccountSettings?
+  sessions        UserSession[]
+  searchHistory   SearchHistory[]
 
   @@index([fullName])
   @@index([location])
@@ -181,23 +209,112 @@ model Block {
 
 /// User-generated content. Cover photo updates are stored as COVER_PHOTO posts.
 model Post {
-  id              String      @id @default(uuid()) @db.Uuid
-  authorId        String      @map("author_id") @db.Uuid
-  content         String?     @db.Text
-  postType        PostType    @default(TEXT) @map("post_type")
-  privacy         PostPrivacy @default(PUBLIC)
-  mediaUrl        String?     @map("media_url")
-  thumbnailUrl    String?     @map("thumbnail_url")
-  isLongFormVideo Boolean     @default(false) @map("is_long_form_video")
-  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id              String           @id @default(uuid()) @db.Uuid
+  authorId        String           @map("author_id") @db.Uuid
+  content         String?          @db.Text
+  title           String?          @db.VarChar(255)
+  description     String?          @db.Text
+  postType        PostType         @default(TEXT) @map("post_type")
+  privacy         PostPrivacy      @default(PUBLIC)
+  mediaUrl        String?          @map("media_url")
+  thumbnailUrl    String?          @map("thumbnail_url")
+  isLongFormVideo Boolean          @default(false) @map("is_long_form_video")
+  category        ExploreCategory? @map("category")
+  viewCount       Int              @default(0) @map("view_count")
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  author     Profile  @relation("AuthorPosts", fields: [authorId], references: [id], onDelete: Cascade)
-  pinnedBy   Profile? @relation("PinnedPost")
+  author    Profile       @relation("AuthorPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  pinnedBy  Profile?      @relation("PinnedPost")
+  hashtags  PostHashtag[]
 
   @@index([authorId, createdAt(sort: Desc)])
   @@index([authorId, isLongFormVideo, createdAt(sort: Desc)])
+  @@index([category, viewCount(sort: Desc)])
+  @@index([viewCount(sort: Desc), createdAt(sort: Desc)])
   @@map("posts")
+}
+
+/// Normalized hashtag registry for discovery and search.
+model Hashtag {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(100)
+  postCount Int      @default(0) @map("post_count")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  posts PostHashtag[]
+
+  @@index([name])
+  @@map("hashtags")
+}
+
+/// Many-to-many link between posts and hashtags.
+model PostHashtag {
+  postId    String @map("post_id") @db.Uuid
+  hashtagId String @map("hashtag_id") @db.Uuid
+
+  post    Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  hashtag Hashtag @relation(fields: [hashtagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, hashtagId])
+  @@index([hashtagId])
+  @@map("post_hashtags")
+}
+
+/// Per-user recent search queries (Facebook-style search history).
+model SearchHistory {
+  id         String     @id @default(uuid()) @db.Uuid
+  userId     String     @map("user_id") @db.Uuid
+  query      String     @db.VarChar(255)
+  searchType SearchType @default(ALL) @map("search_type")
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("search_history")
+}
+
+/// Extended account metadata beyond Supabase Auth (phone, security timestamps).
+model UserAccountSettings {
+  profileId               String    @id @map("profile_id") @db.Uuid
+  phone                   String?   @db.VarChar(20)
+  phoneVerifiedAt         DateTime? @map("phone_verified_at") @db.Timestamptz(6)
+  pendingEmail            String?   @map("pending_email") @db.VarChar(255)
+  pendingEmailOtp         String?   @map("pending_email_otp") @db.VarChar(10)
+  pendingEmailOtpExpiresAt DateTime? @map("pending_email_otp_expires_at") @db.Timestamptz(6)
+  pendingPhone            String?   @map("pending_phone") @db.VarChar(20)
+  pendingPhoneOtp         String?   @map("pending_phone_otp") @db.VarChar(10)
+  pendingPhoneOtpExpiresAt DateTime? @map("pending_phone_otp_expires_at") @db.Timestamptz(6)
+  lastPasswordChangeAt    DateTime? @map("last_password_change_at") @db.Timestamptz(6)
+  lastLoginAt             DateTime? @map("last_login_at") @db.Timestamptz(6)
+  lastLoginLocation       String?   @map("last_login_location") @db.VarChar(255)
+  lastLoginDevice         String?   @map("last_login_device") @db.VarChar(255)
+  twoFactorEnabled        Boolean   @default(false) @map("two_factor_enabled")
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("user_account_settings")
+}
+
+/// Active login sessions for the security settings screen.
+model UserSession {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  deviceName   String   @map("device_name") @db.VarChar(255)
+  userAgent    String?  @map("user_agent") @db.VarChar(500)
+  ipAddress    String?  @map("ip_address") @db.VarChar(45)
+  location     String?  @db.VarChar(255)
+  isCurrent    Boolean  @default(false) @map("is_current")
+  lastActiveAt DateTime @default(now()) @map("last_active_at") @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, lastActiveAt(sort: Desc)])
+  @@map("user_sessions")
 }
 
 /// In-app notifications (follow, follow request, etc.).
