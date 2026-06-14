@@ -55,6 +55,10 @@ const swaggerDefinition: swaggerJSDoc.OAS3Definition = {
         'Account credentials (password, email, phone), privacy defaults, security ' +
         'overview, and active session management',
     },
+    {
+      name: 'Post',
+      description: 'Create, edit, delete, and read posts, including multi-photo uploads',
+    },
   ],
   components: {
     securitySchemes: {
@@ -289,6 +293,14 @@ const swaggerDefinition: swaggerJSDoc.OAS3Definition = {
           joinedDate: { type: 'string', format: 'date-time' },
         },
       },
+      PostMediaView: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          url: { type: 'string', format: 'uri' },
+          position: { type: 'integer', example: 0 },
+        },
+      },
       PostView: {
         type: 'object',
         properties: {
@@ -297,8 +309,14 @@ const swaggerDefinition: swaggerJSDoc.OAS3Definition = {
           content: { type: 'string', nullable: true },
           postType: { $ref: '#/components/schemas/PostType' },
           privacy: { $ref: '#/components/schemas/PostPrivacy' },
+          category: {
+            allOf: [{ $ref: '#/components/schemas/ExploreCategory' }],
+            nullable: true,
+          },
           mediaUrl: { type: 'string', nullable: true },
           thumbnailUrl: { type: 'string', nullable: true },
+          media: { type: 'array', items: { $ref: '#/components/schemas/PostMediaView' } },
+          viewCount: { type: 'integer', example: 0 },
           isLongFormVideo: { type: 'boolean' },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
@@ -550,6 +568,30 @@ const swaggerDefinition: swaggerJSDoc.OAS3Definition = {
         required: ['messagesFrom'],
         properties: {
           messagesFrom: { $ref: '#/components/schemas/MessagePermission' },
+        },
+      },
+
+      // ── Request bodies — Post ─────────────────────────────────────────────
+      CreatePostRequest: {
+        type: 'object',
+        properties: {
+          content: { type: 'string', maxLength: 5000 },
+          privacy: { $ref: '#/components/schemas/PostPrivacy' },
+          category: { $ref: '#/components/schemas/ExploreCategory' },
+          images: {
+            type: 'array',
+            items: { type: 'string', format: 'binary' },
+            description: 'Up to 10 image files (JPEG, PNG, WebP, GIF; 5 MB each).',
+          },
+        },
+      },
+      UpdatePostRequest: {
+        type: 'object',
+        description: 'All fields optional; only provided fields are updated. Photos cannot be changed.',
+        properties: {
+          content: { type: 'string', maxLength: 5000 },
+          privacy: { $ref: '#/components/schemas/PostPrivacy' },
+          category: { $ref: '#/components/schemas/ExploreCategory' },
         },
       },
     },
