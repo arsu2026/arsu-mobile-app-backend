@@ -43,6 +43,7 @@ export const env = {
   SUPABASE_URL: requireEnv('SUPABASE_URL'),
   SUPABASE_ANON_KEY: requireEnv('SUPABASE_ANON_KEY'),
   SUPABASE_SERVICE_ROLE_KEY: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
+  SUPABASE_POST_MEDIA_BUCKET: optionalEnv('SUPABASE_POST_MEDIA_BUCKET', 'post-media'),
 
   // Session
   SESSION_SECRET: requireEnv('SESSION_SECRET'),

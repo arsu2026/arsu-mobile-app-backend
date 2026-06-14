@@ -14,6 +14,14 @@ export const supabaseClient = {
   },
 };
 
+// A single shared bucket object so `from()` returns the same handle every call,
+// which lets storage specs assert on `.upload` / `.getPublicUrl` / `.remove`.
+const storageBucket = {
+  upload: jest.fn(),
+  getPublicUrl: jest.fn(),
+  remove: jest.fn(),
+};
+
 export const supabaseAdmin = {
   auth: {
     getUser: jest.fn(),
@@ -21,5 +29,8 @@ export const supabaseAdmin = {
       signOut: jest.fn(),
       updateUserById: jest.fn(),
     },
+  },
+  storage: {
+    from: jest.fn(() => storageBucket),
   },
 };
