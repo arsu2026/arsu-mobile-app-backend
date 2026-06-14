@@ -22,9 +22,7 @@ describe('storage.service', () => {
 
       const url = await uploadImage(Buffer.from('img'), 'image/jpeg', USER_ID);
 
-      expect(url).toBe(
-        'https://x.supabase.co/storage/v1/object/public/post-media/u/a.jpg',
-      );
+      expect(url).toBe('https://x.supabase.co/storage/v1/object/public/post-media/u/a.jpg');
       expect(mockUpload).toHaveBeenCalledTimes(1);
       const [path, , opts] = mockUpload.mock.calls[0];
       expect(path).toMatch(new RegExp(`^${USER_ID}/.+\\.jpg$`));
@@ -33,18 +31,16 @@ describe('storage.service', () => {
 
     it('throws when the upload fails', async () => {
       mockUpload.mockResolvedValue({ data: null, error: { message: 'boom' } });
-      await expect(
-        uploadImage(Buffer.from('img'), 'image/png', USER_ID),
-      ).rejects.toThrow(/upload failed/i);
+      await expect(uploadImage(Buffer.from('img'), 'image/png', USER_ID)).rejects.toThrow(
+        /upload failed/i,
+      );
     });
   });
 
   describe('deleteImages', () => {
     it('maps public URLs back to object paths and removes them', async () => {
       mockRemove.mockResolvedValue({ data: [], error: null });
-      await deleteImages([
-        'https://x.supabase.co/storage/v1/object/public/post-media/user1/a.jpg',
-      ]);
+      await deleteImages(['https://x.supabase.co/storage/v1/object/public/post-media/user1/a.jpg']);
       expect(mockRemove).toHaveBeenCalledWith(['user1/a.jpg']);
     });
 

@@ -7,8 +7,7 @@ import { extractHashtags } from './hashtag.util';
 import * as repo from './post.repository';
 import type { CreatePostInput, PostView, UpdatePostInput } from './post.types';
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function assertValidUuid(id: string): void {
   if (!UUID_REGEX.test(id)) throw new BadRequestError('Invalid ID format');
@@ -129,7 +128,11 @@ export async function updatePost(
   if (!post) throw new NotFoundError('Post');
   if (post.authorId !== userId) throw new ForbiddenError('You can only edit your own posts');
 
-  const data: { content?: string | null; privacy?: PostPrivacy; category?: ExploreCategory | null } = {};
+  const data: {
+    content?: string | null;
+    privacy?: PostPrivacy;
+    category?: ExploreCategory | null;
+  } = {};
   if (input.content !== undefined) data.content = input.content.trim() || null;
   if (input.privacy !== undefined) data.privacy = input.privacy;
   if (input.category !== undefined) data.category = input.category;

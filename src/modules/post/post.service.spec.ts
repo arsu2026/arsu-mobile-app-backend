@@ -4,13 +4,7 @@ jest.mock('../../common/storage/storage.service');
 import * as repo from './post.repository';
 import * as storage from '../../common/storage/storage.service';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../common/errors';
-import {
-  createPost,
-  deletePost,
-  getPostById,
-  listPostsByAuthor,
-  updatePost,
-} from './post.service';
+import { createPost, deletePost, getPostById, listPostsByAuthor, updatePost } from './post.service';
 
 const mockCreatePost = repo.createPost as jest.Mock;
 const mockFindPostById = repo.findPostById as jest.Mock;
@@ -93,9 +87,7 @@ describe('post.service', () => {
     });
 
     it('rejects a post with neither text nor images', async () => {
-      await expect(createPost(USER_A, { images: [] })).rejects.toBeInstanceOf(
-        BadRequestError,
-      );
+      await expect(createPost(USER_A, { images: [] })).rejects.toBeInstanceOf(BadRequestError);
     });
   });
 
@@ -158,9 +150,9 @@ describe('post.service', () => {
   describe('updatePost', () => {
     it('rejects editing someone else’s post', async () => {
       mockFindPostById.mockResolvedValue({ ...basePost, authorId: USER_B });
-      await expect(
-        updatePost(POST_ID, USER_A, { content: 'x' }),
-      ).rejects.toBeInstanceOf(ForbiddenError);
+      await expect(updatePost(POST_ID, USER_A, { content: 'x' })).rejects.toBeInstanceOf(
+        ForbiddenError,
+      );
     });
 
     it('updates content and re-syncs hashtags', async () => {
@@ -176,9 +168,7 @@ describe('post.service', () => {
 
     it('rejects an empty update', async () => {
       mockFindPostById.mockResolvedValue({ ...basePost, authorId: USER_A });
-      await expect(updatePost(POST_ID, USER_A, {})).rejects.toBeInstanceOf(
-        BadRequestError,
-      );
+      await expect(updatePost(POST_ID, USER_A, {})).rejects.toBeInstanceOf(BadRequestError);
     });
   });
 

@@ -2,10 +2,7 @@ import { extractHashtags } from './hashtag.util';
 
 describe('extractHashtags', () => {
   it('extracts unique, lowercased tags', () => {
-    expect(extractHashtags('Love #Coding and #coding and #Travel')).toEqual([
-      'coding',
-      'travel',
-    ]);
+    expect(extractHashtags('Love #Coding and #coding and #Travel')).toEqual(['coding', 'travel']);
   });
 
   it('returns [] for null or empty content', () => {

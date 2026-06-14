@@ -587,7 +587,8 @@ const swaggerDefinition: swaggerJSDoc.OAS3Definition = {
       },
       UpdatePostRequest: {
         type: 'object',
-        description: 'All fields optional; only provided fields are updated. Photos cannot be changed.',
+        description:
+          'All fields optional; only provided fields are updated. Photos cannot be changed.',
         properties: {
           content: { type: 'string', maxLength: 5000 },
           privacy: { $ref: '#/components/schemas/PostPrivacy' },

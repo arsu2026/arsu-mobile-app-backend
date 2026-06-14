@@ -81,7 +81,13 @@ const router = Router();
  *           application/json:
  *             schema: { $ref: '#/components/schemas/ErrorResponse' }
  */
-router.post('/', supabaseAuthGuard, uploadPostImages, validateBody(CreatePostDto), postController.createPost);
+router.post(
+  '/',
+  supabaseAuthGuard,
+  uploadPostImages,
+  validateBody(CreatePostDto),
+  postController.createPost,
+);
 router.get('/', validateQuery(ListPostsDto), optionalSupabaseAuthGuard, postController.listPosts);
 
 /**
