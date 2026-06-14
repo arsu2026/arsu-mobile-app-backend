@@ -227,12 +227,27 @@ model Post {
   author    Profile       @relation("AuthorPosts", fields: [authorId], references: [id], onDelete: Cascade)
   pinnedBy  Profile?      @relation("PinnedPost")
   hashtags  PostHashtag[]
+  media     PostMedia[]
 
   @@index([authorId, createdAt(sort: Desc)])
   @@index([authorId, isLongFormVideo, createdAt(sort: Desc)])
   @@index([category, viewCount(sort: Desc)])
   @@index([viewCount(sort: Desc), createdAt(sort: Desc)])
   @@map("posts")
+}
+
+/// Ordered photos attached to a post (Facebook-album style).
+model PostMedia {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  url       String
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@map("post_media")
 }
 
 /// Normalized hashtag registry for discovery and search.
