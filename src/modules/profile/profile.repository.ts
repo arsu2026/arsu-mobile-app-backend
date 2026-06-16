@@ -412,14 +412,18 @@ export async function isAcceptedFollower(viewerId: string, profileOwnerId: strin
   return row?.status === 'ACCEPTED';
 }
 
-export async function touchLastActive(userId: string): Promise<{ lastActiveAt: Date }> {
+export async function touchLastActive(
+  userId: string,
+): Promise<{ lastActiveAt: Date; updated: boolean }> {
   const lastActiveAt = new Date();
-  await prisma.profile.update({
-    where: { id: userId },
-    data: { lastActiveAt },
-    select: { id: true },
-  });
-  return { lastActiveAt };
+  // Raw UPDATE rather than prisma.profile.update: this is pinged ~every 60s per
+  // active user, and a Prisma update would also bump `updated_at` via @updatedAt
+  // (making "profile last edited" meaningless). The affected-row count also tells
+  // us whether the profile exists without a second read.
+  const count = await prisma.$executeRaw`
+    UPDATE "profiles" SET "last_active_at" = ${lastActiveAt} WHERE "id" = ${userId}::uuid
+  `;
+  return { lastActiveAt, updated: count > 0 };
 }
 
 /**

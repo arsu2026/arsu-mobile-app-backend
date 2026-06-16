@@ -671,7 +671,8 @@ export async function unpinPost(userId: string) {
 
 export async function recordHeartbeat(
   userId: string,
-): Promise<{ lastActiveAt: string; isOnline: true }> {
-  const { lastActiveAt } = await repo.touchLastActive(userId);
-  return { lastActiveAt: lastActiveAt.toISOString(), isOnline: true };
+): Promise<{ lastSeen: string; isOnline: true }> {
+  const { lastActiveAt, updated } = await repo.touchLastActive(userId);
+  if (!updated) throw new NotFoundError('Profile');
+  return { lastSeen: lastActiveAt.toISOString(), isOnline: true };
 }

@@ -176,10 +176,11 @@ router.get('/follow-requests', supabaseAuthGuard, profileController.getFollowReq
  *               type: object
  *               properties:
  *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: 'Presence updated' }
  *                 data:
  *                   type: object
  *                   properties:
- *                     lastActiveAt: { type: string, format: 'date-time' }
+ *                     lastSeen: { type: string, format: 'date-time' }
  *                     isOnline: { type: boolean, example: true }
  *       '401':
  *         description: Missing or invalid access token.

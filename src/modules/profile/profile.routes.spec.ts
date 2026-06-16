@@ -148,7 +148,10 @@ describe('GET /api/v1/profile/search', () => {
 describe('POST /api/v1/profile/me/heartbeat', () => {
   it('updates presence for an authenticated user', async () => {
     authAs(USER_A);
-    mockTouchLastActive.mockResolvedValue({ lastActiveAt: new Date('2026-06-16T12:00:00.000Z') });
+    mockTouchLastActive.mockResolvedValue({
+      lastActiveAt: new Date('2026-06-16T12:00:00.000Z'),
+      updated: true,
+    });
 
     const res = await request(app)
       .post('/api/v1/profile/me/heartbeat')
@@ -157,7 +160,20 @@ describe('POST /api/v1/profile/me/heartbeat', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.data.isOnline).toBe(true);
+    expect(res.body.data.lastSeen).toBe('2026-06-16T12:00:00.000Z');
     expect(mockTouchLastActive).toHaveBeenCalledWith(USER_A);
+  });
+
+  it('returns 404 when the authenticated user has no profile row', async () => {
+    authAs(USER_A);
+    mockTouchLastActive.mockResolvedValue({ lastActiveAt: new Date(), updated: false });
+
+    const res = await request(app)
+      .post('/api/v1/profile/me/heartbeat')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
   });
 
   it('returns 401 without auth', async () => {

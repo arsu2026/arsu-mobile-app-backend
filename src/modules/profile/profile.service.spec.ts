@@ -161,12 +161,18 @@ describe('profile.service', () => {
   describe('recordHeartbeat', () => {
     it('stamps last active and reports the user online', async () => {
       const now = new Date('2026-06-16T12:00:00.000Z');
-      mockTouchLastActive.mockResolvedValue({ lastActiveAt: now });
+      mockTouchLastActive.mockResolvedValue({ lastActiveAt: now, updated: true });
 
       const result = await recordHeartbeat(USER_A);
 
       expect(mockTouchLastActive).toHaveBeenCalledWith(USER_A);
-      expect(result).toEqual({ lastActiveAt: now.toISOString(), isOnline: true });
+      expect(result).toEqual({ lastSeen: now.toISOString(), isOnline: true });
+    });
+
+    it('throws NotFoundError when no profile row was updated', async () => {
+      mockTouchLastActive.mockResolvedValue({ lastActiveAt: new Date(), updated: false });
+
+      await expect(recordHeartbeat(USER_A)).rejects.toBeInstanceOf(NotFoundError);
     });
   });
 
