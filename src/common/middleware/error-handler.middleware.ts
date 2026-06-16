@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { env } from '../../config/env.config';
 import { logger } from '../utils/logger';
 import { sendError } from '../utils/response.util';
@@ -25,6 +26,13 @@ export function errorHandler(
       statusCode: err.statusCode,
       errors: err.errors,
     });
+    return;
+  }
+
+  // Prisma "record not found" on update/delete → 404 (mirrors NotFoundError)
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+    logger.warn(`[PrismaError] ${req.method} ${req.path} → P2025 record not found`);
+    sendError(res, 'Resource not found', { statusCode: 404 });
     return;
   }
 
