@@ -11,6 +11,9 @@ import {
   getProfile,
   updateProfile,
   blockUser,
+  recordHeartbeat,
+  getFollowRequests,
+  getSuggestions,
 } from './profile.service';
 
 const mockFindProfileById = repo.findProfileById as jest.Mock;
@@ -26,6 +29,15 @@ const mockFindBlockBetween = repo.findBlockBetween as jest.Mock;
 const mockRemoveAllFollowRelationships = repo.removeAllFollowRelationships as jest.Mock;
 const mockCreateBlock = repo.createBlock as jest.Mock;
 const mockFindBlock = repo.findBlock as jest.Mock;
+const mockTouchLastActive = repo.touchLastActive as jest.Mock;
+const mockListPendingFollowRequests = repo.listPendingFollowRequests as jest.Mock;
+const mockFindFollowingIds = repo.findFollowingIds as jest.Mock;
+const mockCountMutualFollows = repo.countMutualFollows as jest.Mock;
+const mockFindBlockedUserIds = repo.findBlockedUserIds as jest.Mock;
+const mockFindSecondDegreeConnections = repo.findSecondDegreeConnections as jest.Mock;
+const mockFindProfilesByIds = repo.findProfilesByIds as jest.Mock;
+const mockFindContactSuggestions = repo.findContactSuggestions as jest.Mock;
+const mockFindLocationSuggestions = repo.findLocationSuggestions as jest.Mock;
 
 const USER_A = '11111111-1111-4111-8111-111111111111';
 const USER_B = '22222222-2222-4222-8222-222222222222';
@@ -143,6 +155,83 @@ describe('profile.service', () => {
 
     it('prevents blocking yourself', async () => {
       await expect(blockUser(USER_A, USER_A)).rejects.toBeInstanceOf(BadRequestError);
+    });
+  });
+
+  describe('recordHeartbeat', () => {
+    it('stamps last active and reports the user online', async () => {
+      const now = new Date('2026-06-16T12:00:00.000Z');
+      mockTouchLastActive.mockResolvedValue({ lastActiveAt: now });
+
+      const result = await recordHeartbeat(USER_A);
+
+      expect(mockTouchLastActive).toHaveBeenCalledWith(USER_A);
+      expect(result).toEqual({ lastActiveAt: now.toISOString(), isOnline: true });
+    });
+  });
+
+  describe('getFollowRequests', () => {
+    const requestRow = (lastActiveAt: Date | null) => ({
+      follower: {
+        id: USER_B,
+        username: 'jane',
+        fullName: 'Jane Doe',
+        avatarUrl: null,
+        lastActiveAt,
+      },
+      createdAt: new Date('2026-06-16T10:00:00.000Z'),
+    });
+
+    it('enriches requests with mutualFriends and online presence', async () => {
+      mockListPendingFollowRequests.mockResolvedValue([requestRow(new Date())]);
+      mockFindFollowingIds.mockResolvedValue([]);
+      mockCountMutualFollows.mockResolvedValue(new Map([[USER_B, 3]]));
+
+      const result = await getFollowRequests(USER_A);
+
+      expect(result[0].mutualFriends).toBe(3);
+      expect(result[0].requester.isOnline).toBe(true);
+      expect(result[0].requester.lastSeen).not.toBeNull();
+      expect(result[0].requestedAt).toBe('2026-06-16T10:00:00.000Z');
+      expect(result[0].requester).not.toHaveProperty('lastActiveAt');
+    });
+
+    it('marks a stale or missing lastActiveAt as offline with zero mutuals', async () => {
+      const stale = new Date(Date.now() - 10 * 60 * 1000);
+      mockListPendingFollowRequests.mockResolvedValue([requestRow(stale)]);
+      mockFindFollowingIds.mockResolvedValue([]);
+      mockCountMutualFollows.mockResolvedValue(new Map());
+
+      const result = await getFollowRequests(USER_A);
+
+      expect(result[0].requester.isOnline).toBe(false);
+      expect(result[0].mutualFriends).toBe(0);
+    });
+  });
+
+  describe('getSuggestions presence', () => {
+    it('attaches presence to suggested users and never leaks lastActiveAt', async () => {
+      const recent = new Date();
+      mockFindProfileById.mockResolvedValue({ ...baseProfile, id: USER_A, location: null });
+      mockFindBlockedUserIds.mockResolvedValue([]);
+      mockFindSecondDegreeConnections.mockResolvedValue([
+        { followerId: USER_B, followingId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' },
+      ]);
+      mockFindProfilesByIds.mockResolvedValue([
+        { id: USER_B, username: 'jane', fullName: 'Jane Doe', avatarUrl: null, lastActiveAt: recent },
+      ]);
+      mockFindContactSuggestions.mockResolvedValue([]);
+      mockFindLocationSuggestions.mockResolvedValue([]);
+      mockFindFollowingIds.mockResolvedValue([]);
+
+      const result = await getSuggestions(USER_A);
+
+      expect(result[0].user.id).toBe(USER_B);
+      expect(result[0].mutualCount).toBe(1);
+      expect(result[0].reason).toBe('mutual_followers');
+      expect(result[0].user.isOnline).toBe(true);
+      expect(result[0].user.lastSeen).toBe(recent.toISOString());
+      expect(result[0].user).not.toHaveProperty('lastActiveAt');
     });
   });
 });

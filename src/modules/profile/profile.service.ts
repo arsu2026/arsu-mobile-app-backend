@@ -11,6 +11,7 @@ import * as repo from './profile.repository';
 import type {
   BasicUserInfo,
   FollowRequestView,
+  FriendCardUser,
   PostView,
   PrivacySettingsView,
   ProfileIntro,
@@ -28,6 +29,36 @@ export function assertValidUserId(userId: string): void {
   if (!UUID_REGEX.test(userId)) {
     throw new BadRequestError('Invalid user ID format');
   }
+}
+
+const ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
+
+function toPresence(lastActiveAt: Date | null): { isOnline: boolean; lastSeen: string | null } {
+  if (!lastActiveAt) return { isOnline: false, lastSeen: null };
+  return {
+    isOnline: Date.now() - lastActiveAt.getTime() < ONLINE_THRESHOLD_MS,
+    lastSeen: lastActiveAt.toISOString(),
+  };
+}
+
+function toFriendCardUser(
+  user: {
+    id: string;
+    username: string | null;
+    fullName: string | null;
+    avatarUrl: string | null;
+    lastActiveAt: Date | null;
+  },
+  isFollowing: boolean,
+): FriendCardUser {
+  return {
+    id: user.id,
+    username: user.username,
+    fullName: user.fullName,
+    avatarUrl: user.avatarUrl,
+    isFollowing,
+    ...toPresence(user.lastActiveAt),
+  };
 }
 
 async function ensureProfileExists(userId: string) {
@@ -428,10 +459,16 @@ export async function rejectFollowRequest(ownerId: string, requesterId: string) 
 
 export async function getFollowRequests(ownerId: string): Promise<FollowRequestView[]> {
   const rows = await repo.listPendingFollowRequests(ownerId);
-  const requesters = await mapBasicUsers(ownerId, rows.map((r) => r.follower));
+  const requesterIds = rows.map((r) => r.follower.id);
 
-  return rows.map((row, index) => ({
-    requester: requesters[index],
+  const [followingIds, mutualMap] = await Promise.all([
+    repo.findFollowingIds(ownerId, requesterIds),
+    repo.countMutualFollows(ownerId, requesterIds),
+  ]);
+
+  return rows.map((row) => ({
+    requester: toFriendCardUser(row.follower, followingIds.includes(row.follower.id)),
+    mutualFriends: mutualMap.get(row.follower.id) ?? 0,
     requestedAt: row.createdAt.toISOString(),
   }));
 }
@@ -523,10 +560,7 @@ export async function getSuggestions(userId: string): Promise<UserSuggestion[]> 
       if (!user) continue;
       seen.add(id);
       suggestions.push({
-        user: {
-          ...user,
-          isFollowing: false,
-        },
+        user: toFriendCardUser(user, false),
         mutualCount: count,
         reason: 'mutual_followers',
       });
@@ -543,7 +577,7 @@ export async function getSuggestions(userId: string): Promise<UserSuggestion[]> 
       if (seen.has(contact.contactUserId)) continue;
       seen.add(contact.contactUserId);
       suggestions.push({
-        user: { ...contact.contactUser, isFollowing: false },
+        user: toFriendCardUser(contact.contactUser, false),
         mutualCount: 0,
         reason: 'contacts',
       });
@@ -561,7 +595,7 @@ export async function getSuggestions(userId: string): Promise<UserSuggestion[]> 
       if (seen.has(match.id)) continue;
       seen.add(match.id);
       suggestions.push({
-        user: { ...match, isFollowing: false },
+        user: toFriendCardUser(match, false),
         mutualCount: 0,
         reason: 'location',
       });
@@ -633,4 +667,13 @@ export async function pinPost(userId: string, postId: string) {
 export async function unpinPost(userId: string) {
   await repo.unpinPost(userId);
   return { message: 'Post unpinned from profile' };
+}
+
+export async function recordHeartbeat(
+  userId: string,
+): Promise<{ lastActiveAt: string; isOnline: true }> {
+  // touchLastActive always writes `new Date()`, so lastActiveAt is non-null here;
+  // the fallback only satisfies the nullable column type.
+  const { lastActiveAt } = await repo.touchLastActive(userId);
+  return { lastActiveAt: (lastActiveAt ?? new Date()).toISOString(), isOnline: true };
 }
