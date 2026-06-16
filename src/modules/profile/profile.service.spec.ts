@@ -188,18 +188,31 @@ describe('profile.service', () => {
       createdAt: new Date('2026-06-16T10:00:00.000Z'),
     });
 
-    it('enriches requests with mutualFriends and online presence', async () => {
+    it('enriches requests with mutualFriends and exposes lastSeen for a followed requester', async () => {
       mockListPendingFollowRequests.mockResolvedValue([requestRow(new Date())]);
-      mockFindFollowingIds.mockResolvedValue([]);
+      mockFindFollowingIds.mockResolvedValue([USER_B]);
       mockCountMutualFollows.mockResolvedValue(new Map([[USER_B, 3]]));
 
       const result = await getFollowRequests(USER_A);
 
       expect(result[0].mutualFriends).toBe(3);
+      expect(result[0].requester.isFollowing).toBe(true);
       expect(result[0].requester.isOnline).toBe(true);
       expect(result[0].requester.lastSeen).not.toBeNull();
       expect(result[0].requestedAt).toBe('2026-06-16T10:00:00.000Z');
       expect(result[0].requester).not.toHaveProperty('lastActiveAt');
+    });
+
+    it('withholds exact lastSeen from a requester the owner does not follow', async () => {
+      mockListPendingFollowRequests.mockResolvedValue([requestRow(new Date())]);
+      mockFindFollowingIds.mockResolvedValue([]);
+      mockCountMutualFollows.mockResolvedValue(new Map([[USER_B, 1]]));
+
+      const result = await getFollowRequests(USER_A);
+
+      expect(result[0].requester.isFollowing).toBe(false);
+      expect(result[0].requester.isOnline).toBe(true);
+      expect(result[0].requester.lastSeen).toBeNull();
     });
 
     it('marks a stale or missing lastActiveAt as offline with zero mutuals', async () => {
@@ -216,7 +229,7 @@ describe('profile.service', () => {
   });
 
   describe('getSuggestions presence', () => {
-    it('attaches presence to suggested users and never leaks lastActiveAt', async () => {
+    it('shows isOnline but withholds exact lastSeen for suggested non-followers', async () => {
       const recent = new Date();
       mockFindProfileById.mockResolvedValue({ ...baseProfile, id: USER_A, location: null });
       mockFindBlockedUserIds.mockResolvedValue([]);
@@ -236,7 +249,7 @@ describe('profile.service', () => {
       expect(result[0].mutualCount).toBe(1);
       expect(result[0].reason).toBe('mutual_followers');
       expect(result[0].user.isOnline).toBe(true);
-      expect(result[0].user.lastSeen).toBe(recent.toISOString());
+      expect(result[0].user.lastSeen).toBeNull();
       expect(result[0].user).not.toHaveProperty('lastActiveAt');
     });
   });

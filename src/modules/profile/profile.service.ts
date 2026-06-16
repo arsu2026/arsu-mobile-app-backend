@@ -51,13 +51,18 @@ function toFriendCardUser(
   },
   isFollowing: boolean,
 ): FriendCardUser {
+  const presence = toPresence(user.lastActiveAt);
   return {
     id: user.id,
     username: user.username,
     fullName: user.fullName,
     avatarUrl: user.avatarUrl,
     isFollowing,
-    ...toPresence(user.lastActiveAt),
+    isOnline: presence.isOnline,
+    // The exact last-seen timestamp is only disclosed to accounts the viewer
+    // follows. Non-connections (e.g. suggestion cards) get the online flag but
+    // not the precise activity schedule, which would otherwise be harvestable.
+    lastSeen: isFollowing ? presence.lastSeen : null,
   };
 }
 
