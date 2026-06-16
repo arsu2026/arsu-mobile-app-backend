@@ -157,6 +157,40 @@ router.get('/follow-requests', supabaseAuthGuard, profileController.getFollowReq
 
 /**
  * @openapi
+ * /profile/me/heartbeat:
+ *   post:
+ *     tags: [Profile]
+ *     summary: Update the current user's presence (last-active timestamp)
+ *     description: >
+ *       Stamps `last_active_at = now()` for the authenticated user. The FE pings
+ *       this periodically while foregrounded; `isOnline`/`lastSeen` on friend cards
+ *       are derived from it.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Presence updated.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     lastActiveAt: { type: string, format: 'date-time' }
+ *                     isOnline: { type: boolean, example: true }
+ *       '401':
+ *         description: Missing or invalid access token.
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/ErrorResponse' }
+ */
+router.post('/me/heartbeat', supabaseAuthGuard, profileController.heartbeat);
+
+/**
+ * @openapi
  * /profile/update:
  *   put:
  *     tags: [Profile]

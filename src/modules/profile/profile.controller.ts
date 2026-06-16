@@ -187,3 +187,9 @@ export async function unpinPost(req: Request, res: Response): Promise<void> {
   const result = await profileService.unpinPost(userId);
   sendSuccess(res, result, { message: result.message });
 }
+
+export async function heartbeat(req: Request, res: Response): Promise<void> {
+  const userId = requireUserId(req);
+  const result = await profileService.recordHeartbeat(userId);
+  sendSuccess(res, result, { message: 'Presence updated' });
+}

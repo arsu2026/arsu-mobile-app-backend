@@ -25,6 +25,7 @@ const mockCountPosts = repo.countPosts as jest.Mock;
 const mockFindFollow = repo.findFollow as jest.Mock;
 const mockUpdateProfile = repo.updateProfile as jest.Mock;
 const mockFindUsernameConflict = repo.findUsernameConflict as jest.Mock;
+const mockTouchLastActive = repo.touchLastActive as jest.Mock;
 
 const USER_A = '11111111-1111-4111-8111-111111111111';
 const USER_B = '22222222-2222-4222-8222-222222222222';
@@ -141,5 +142,28 @@ describe('GET /api/v1/profile/search', () => {
 
     expect(res.status).toBe(422);
     expect(res.body.success).toBe(false);
+  });
+});
+
+describe('POST /api/v1/profile/me/heartbeat', () => {
+  it('updates presence for an authenticated user', async () => {
+    authAs(USER_A);
+    mockTouchLastActive.mockResolvedValue({ lastActiveAt: new Date('2026-06-16T12:00:00.000Z') });
+
+    const res = await request(app)
+      .post('/api/v1/profile/me/heartbeat')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.isOnline).toBe(true);
+    expect(mockTouchLastActive).toHaveBeenCalledWith(USER_A);
+  });
+
+  it('returns 401 without auth', async () => {
+    const res = await request(app).post('/api/v1/profile/me/heartbeat');
+
+    expect(res.status).toBe(401);
+    expect(mockTouchLastActive).not.toHaveBeenCalled();
   });
 });
