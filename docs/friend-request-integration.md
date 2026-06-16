@@ -24,8 +24,11 @@ The API returns a single `fullName`, not split names, and uses follow vocabulary
 | `profilePicture` | `avatarUrl` |
 | `mutualFriends` | `mutualFriends` (requests) / `mutualCount` (suggestions) |
 | `isOnline` | `isOnline` |
-| `lastSeen` | `lastSeen` (ISO timestamp; format client-side) |
+| `lastSeen` | `lastSeen` (ISO timestamp; `null` unless you follow the user — format client-side) |
 | `id` | `requester.id` (requests) / `user.id` (suggestions) |
+| (follow button state) | `isFollowing` (true once the viewer follows them) |
 
-Presence (`isOnline`/`lastSeen`) is only present on the friend-request and
-suggestion responses, derived from a 2-minute heartbeat window.
+Presence is only present on the friend-request and suggestion responses, derived
+from a 2-minute heartbeat window. `isOnline` is always returned, but the exact
+`lastSeen` timestamp is disclosed only for users you follow (it is `null` for
+suggested non-connections) to avoid leaking strangers' activity schedules.
