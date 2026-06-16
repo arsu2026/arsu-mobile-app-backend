@@ -250,6 +250,30 @@ const swaggerDefinition: swaggerJSDoc.OAS3Definition = {
           isFollowingBack: { type: 'boolean' },
         },
       },
+      NotificationActor: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          username: { type: 'string', nullable: true, example: 'jane_doe' },
+          fullName: { type: 'string', nullable: true, example: 'Jane Doe' },
+          avatarUrl: { type: 'string', nullable: true },
+        },
+      },
+      NotificationView: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          type: {
+            type: 'string',
+            enum: ['FOLLOW', 'FOLLOW_REQUEST', 'FOLLOW_ACCEPTED'],
+          },
+          actor: { $ref: '#/components/schemas/NotificationActor' },
+          entityId: { type: 'string', format: 'uuid', nullable: true },
+          message: { type: 'string', nullable: true, example: 'started following you' },
+          isRead: { type: 'boolean' },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
       ProfileView: {
         type: 'object',
         properties: {

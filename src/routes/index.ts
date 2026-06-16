@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authRouter } from '../modules/auth/auth.routes';
+import { notificationRouter } from '../modules/notification/notification.routes';
 import { postRouter } from '../modules/post/post.routes';
 import { profileRouter } from '../modules/profile/profile.routes';
 import { searchRouter } from '../modules/search/search.routes';
@@ -19,6 +20,7 @@ router.use('/profile', profileRouter);
 router.use('/search', searchRouter);
 router.use('/settings', settingsRouter);
 router.use('/posts', postRouter);
+router.use('/notifications', notificationRouter);
 
 // ── API Version Info ──────────────────────────────────────────────────────────
 router.get('/', (_req, res) => {
