@@ -356,17 +356,30 @@ const swaggerDefinition: swaggerJSDoc.OAS3Definition = {
           followingListVisibility: { $ref: '#/components/schemas/VisibilityLevel' },
         },
       },
+      FriendCardUser: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          username: { type: 'string', nullable: true, example: 'jane_doe' },
+          fullName: { type: 'string', nullable: true, example: 'Jane Doe' },
+          avatarUrl: { type: 'string', nullable: true },
+          isFollowing: { type: 'boolean' },
+          isOnline: { type: 'boolean' },
+          lastSeen: { type: 'string', format: 'date-time', nullable: true },
+        },
+      },
       FollowRequestView: {
         type: 'object',
         properties: {
-          requester: { $ref: '#/components/schemas/BasicUserInfo' },
+          requester: { $ref: '#/components/schemas/FriendCardUser' },
+          mutualFriends: { type: 'integer', example: 3 },
           requestedAt: { type: 'string', format: 'date-time' },
         },
       },
       UserSuggestion: {
         type: 'object',
         properties: {
-          user: { $ref: '#/components/schemas/BasicUserInfo' },
+          user: { $ref: '#/components/schemas/FriendCardUser' },
           mutualCount: { type: 'integer', example: 4 },
           reason: {
             type: 'string',
