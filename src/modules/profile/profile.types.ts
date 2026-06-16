@@ -68,13 +68,19 @@ export interface PrivacySettingsView {
   followingListVisibility: VisibilityLevel;
 }
 
+export interface FriendCardUser extends BasicUserInfo {
+  isOnline: boolean;
+  lastSeen: string | null;
+}
+
 export interface FollowRequestView {
-  requester: BasicUserInfo;
+  requester: FriendCardUser;
+  mutualFriends: number;
   requestedAt: string;
 }
 
 export interface UserSuggestion {
-  user: BasicUserInfo;
+  user: FriendCardUser;
   mutualCount: number;
   reason: 'mutual_followers' | 'contacts' | 'location';
 }
