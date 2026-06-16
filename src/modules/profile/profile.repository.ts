@@ -7,6 +7,7 @@ const basicUserSelect = {
   username: true,
   fullName: true,
   avatarUrl: true,
+  lastActiveAt: true,
 } satisfies Prisma.ProfileSelect;
 
 export async function findProfileById(userId: string) {
@@ -409,4 +410,43 @@ export async function isAcceptedFollower(viewerId: string, profileOwnerId: strin
     },
   });
   return row?.status === 'ACCEPTED';
+}
+
+export async function touchLastActive(userId: string) {
+  return prisma.profile.update({
+    where: { id: userId },
+    data: { lastActiveAt: new Date() },
+    select: { lastActiveAt: true },
+  });
+}
+
+/**
+ * For each id in `otherIds`, counts how many accounts the viewer follows
+ * (ACCEPTED) also follow that user (ACCEPTED) — the "followed by N people you
+ * follow" metric. Returns a map keyed by the other user's id.
+ */
+export async function countMutualFollows(
+  viewerId: string,
+  otherIds: string[],
+): Promise<Map<string, number>> {
+  if (otherIds.length === 0) return new Map();
+
+  const myFollowing = await prisma.follow.findMany({
+    where: { followerId: viewerId, status: 'ACCEPTED' },
+    select: { followingId: true },
+  });
+  const followingIds = myFollowing.map((f) => f.followingId);
+  if (followingIds.length === 0) return new Map();
+
+  const groups = await prisma.follow.groupBy({
+    by: ['followingId'],
+    where: {
+      followerId: { in: followingIds },
+      followingId: { in: otherIds },
+      status: 'ACCEPTED',
+    },
+    _count: { followingId: true },
+  });
+
+  return new Map(groups.map((g) => [g.followingId, g._count.followingId]));
 }
