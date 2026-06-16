@@ -672,8 +672,6 @@ export async function unpinPost(userId: string) {
 export async function recordHeartbeat(
   userId: string,
 ): Promise<{ lastActiveAt: string; isOnline: true }> {
-  // touchLastActive always writes `new Date()`, so lastActiveAt is non-null here;
-  // the fallback only satisfies the nullable column type.
   const { lastActiveAt } = await repo.touchLastActive(userId);
-  return { lastActiveAt: (lastActiveAt ?? new Date()).toISOString(), isOnline: true };
+  return { lastActiveAt: lastActiveAt.toISOString(), isOnline: true };
 }

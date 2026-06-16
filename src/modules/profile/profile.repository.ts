@@ -412,12 +412,14 @@ export async function isAcceptedFollower(viewerId: string, profileOwnerId: strin
   return row?.status === 'ACCEPTED';
 }
 
-export async function touchLastActive(userId: string) {
-  return prisma.profile.update({
+export async function touchLastActive(userId: string): Promise<{ lastActiveAt: Date }> {
+  const lastActiveAt = new Date();
+  await prisma.profile.update({
     where: { id: userId },
-    data: { lastActiveAt: new Date() },
-    select: { lastActiveAt: true },
+    data: { lastActiveAt },
+    select: { id: true },
   });
+  return { lastActiveAt };
 }
 
 /**
