@@ -16,3 +16,33 @@ export interface NotificationView {
   isRead: boolean;
   createdAt: string;
 }
+
+export interface NotificationPreferencesView {
+  preferences: {
+    comments: boolean;
+    tags: boolean;
+    reminders: boolean;
+    moreActivityAboutYou: boolean;
+    updatesFromFriends: boolean;
+  };
+  channels: {
+    push: boolean;
+    email: boolean;
+    sms: boolean;
+  };
+}
+
+export interface UpdateNotificationPrefsInput {
+  preferences?: {
+    comments?: boolean;
+    tags?: boolean;
+    reminders?: boolean;
+    moreActivityAboutYou?: boolean;
+    updatesFromFriends?: boolean;
+  };
+  channels?: {
+    push?: boolean;
+    email?: boolean;
+    sms?: boolean;
+  };
+}

@@ -1,8 +1,13 @@
+import type { NotificationType, Prisma } from '@prisma/client';
 import { BadRequestError, NotFoundError } from '../../common/errors';
 import { buildPaginationMeta } from '../../common/utils/response.util';
 import type { PaginationMeta } from '../../common/utils/response.util';
 import * as repo from './notification.repository';
-import type { NotificationView } from './notification.types';
+import type {
+  NotificationPreferencesView,
+  NotificationView,
+  UpdateNotificationPrefsInput,
+} from './notification.types';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -70,4 +75,80 @@ export async function deleteNotification(recipientId: string, id: string): Promi
 
 export async function clearAll(recipientId: string): Promise<void> {
   await repo.deleteAll(recipientId);
+}
+
+type PrefFlag = 'comments' | 'tags' | 'moreActivityAboutYou' | 'updatesFromFriends';
+
+// Which preference flag gates each notification type. `reminders` has no
+// emitter today. null = always allowed (no gating).
+const PREF_GATE: Record<NotificationType, PrefFlag | null> = {
+  FOLLOW: 'updatesFromFriends',
+  FOLLOW_REQUEST: 'updatesFromFriends',
+  FOLLOW_ACCEPTED: 'updatesFromFriends',
+  LIKE: 'moreActivityAboutYou',
+  SHARE: 'moreActivityAboutYou',
+  COMMENT: 'comments',
+  MENTION: 'tags',
+};
+
+export async function emitNotification(input: {
+  recipientId: string;
+  actorId: string;
+  type: NotificationType;
+  entityId?: string | null;
+  message?: string | null;
+}): Promise<void> {
+  if (input.recipientId === input.actorId) return; // never notify yourself
+
+  const prefs = await repo.ensurePreferences(input.recipientId);
+  const gate = PREF_GATE[input.type];
+  if (gate && !prefs[gate]) return; // recipient turned this category off
+
+  await repo.createNotification({
+    recipientId: input.recipientId,
+    actorId: input.actorId,
+    type: input.type,
+    entityId: input.entityId ?? null,
+    message: input.message ?? null,
+  });
+}
+
+function mapPreferences(
+  p: Awaited<ReturnType<typeof repo.ensurePreferences>>,
+): NotificationPreferencesView {
+  return {
+    preferences: {
+      comments: p.comments,
+      tags: p.tags,
+      reminders: p.reminders,
+      moreActivityAboutYou: p.moreActivityAboutYou,
+      updatesFromFriends: p.updatesFromFriends,
+    },
+    channels: { push: p.pushEnabled, email: p.emailEnabled, sms: p.smsEnabled },
+  };
+}
+
+export async function getPreferences(userId: string): Promise<NotificationPreferencesView> {
+  const prefs = await repo.ensurePreferences(userId);
+  return mapPreferences(prefs);
+}
+
+export async function updatePreferences(
+  userId: string,
+  input: UpdateNotificationPrefsInput,
+): Promise<NotificationPreferencesView> {
+  const data: Prisma.NotificationPreferenceUpdateInput = {};
+  const p = input.preferences ?? {};
+  const c = input.channels ?? {};
+  if (p.comments !== undefined) data.comments = p.comments;
+  if (p.tags !== undefined) data.tags = p.tags;
+  if (p.reminders !== undefined) data.reminders = p.reminders;
+  if (p.moreActivityAboutYou !== undefined) data.moreActivityAboutYou = p.moreActivityAboutYou;
+  if (p.updatesFromFriends !== undefined) data.updatesFromFriends = p.updatesFromFriends;
+  if (c.push !== undefined) data.pushEnabled = c.push;
+  if (c.email !== undefined) data.emailEnabled = c.email;
+  if (c.sms !== undefined) data.smsEnabled = c.sms;
+
+  const updated = await repo.updatePreferences(userId, data);
+  return mapPreferences(updated);
 }

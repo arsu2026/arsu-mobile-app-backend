@@ -1,4 +1,7 @@
 jest.mock('./notification.repository');
+jest.mock('../../common/utils/post-preview.util', () => ({
+  fetchPostPreviews: jest.fn().mockResolvedValue(new Map()),
+}));
 
 import { BadRequestError, NotFoundError } from '../../common/errors';
 import * as repo from './notification.repository';
@@ -11,6 +14,9 @@ const mockMarkRead = repo.markRead as jest.Mock;
 const mockMarkAllRead = repo.markAllRead as jest.Mock;
 const mockDeleteOne = repo.deleteOne as jest.Mock;
 const mockDeleteAll = repo.deleteAll as jest.Mock;
+const mockEnsurePreferences = repo.ensurePreferences as jest.Mock;
+const mockUpdatePreferences = repo.updatePreferences as jest.Mock;
+const mockCreateNotification = repo.createNotification as jest.Mock;
 
 const RECIPIENT = '11111111-1111-4111-8111-111111111111';
 const NOTIF_ID = '33333333-3333-4333-8333-333333333333';
@@ -142,5 +148,90 @@ describe('notification.service', () => {
 
       expect(mockDeleteAll).toHaveBeenCalledWith(RECIPIENT);
     });
+  });
+});
+
+const USER_A = '11111111-1111-4111-8111-111111111111';
+const USER_B = '22222222-2222-4222-8222-222222222222';
+
+const allOnPrefs = {
+  profileId: USER_B,
+  comments: true,
+  tags: true,
+  reminders: false,
+  moreActivityAboutYou: true,
+  updatesFromFriends: true,
+  pushEnabled: true,
+  emailEnabled: false,
+  smsEnabled: false,
+};
+
+describe('notification.service emitNotification', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsurePreferences.mockResolvedValue(allOnPrefs);
+  });
+
+  it('skips creation when recipient === actor', async () => {
+    await service.emitNotification({ recipientId: USER_A, actorId: USER_A, type: 'LIKE', entityId: 'p1' });
+    expect(mockCreateNotification).not.toHaveBeenCalled();
+  });
+
+  it('creates the notification when the gating preference is on', async () => {
+    await service.emitNotification({
+      recipientId: USER_B,
+      actorId: USER_A,
+      type: 'LIKE',
+      entityId: 'p1',
+      message: 'liked your post',
+    });
+    expect(mockCreateNotification).toHaveBeenCalledWith({
+      recipientId: USER_B,
+      actorId: USER_A,
+      type: 'LIKE',
+      entityId: 'p1',
+      message: 'liked your post',
+    });
+  });
+
+  it('suppresses LIKE/SHARE when moreActivityAboutYou is off', async () => {
+    mockEnsurePreferences.mockResolvedValue({ ...allOnPrefs, moreActivityAboutYou: false });
+    await service.emitNotification({ recipientId: USER_B, actorId: USER_A, type: 'LIKE', entityId: 'p1' });
+    await service.emitNotification({ recipientId: USER_B, actorId: USER_A, type: 'SHARE', entityId: 'p1' });
+    expect(mockCreateNotification).not.toHaveBeenCalled();
+  });
+
+  it('suppresses COMMENT when comments is off but allows MENTION (tags on)', async () => {
+    mockEnsurePreferences.mockResolvedValue({ ...allOnPrefs, comments: false });
+    await service.emitNotification({ recipientId: USER_B, actorId: USER_A, type: 'COMMENT', entityId: 'p1' });
+    await service.emitNotification({ recipientId: USER_B, actorId: USER_A, type: 'MENTION', entityId: 'p1' });
+    expect(mockCreateNotification).toHaveBeenCalledTimes(1);
+    expect(mockCreateNotification.mock.calls[0][0].type).toBe('MENTION');
+  });
+});
+
+describe('notification.service preferences', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsurePreferences.mockResolvedValue(allOnPrefs);
+  });
+
+  it('maps stored prefs into the nested view', async () => {
+    const view = await service.getPreferences(USER_B);
+    expect(view).toEqual({
+      preferences: { comments: true, tags: true, reminders: false, moreActivityAboutYou: true, updatesFromFriends: true },
+      channels: { push: true, email: false, sms: false },
+    });
+  });
+
+  it('translates a partial update into prisma fields (channels → *Enabled)', async () => {
+    mockUpdatePreferences.mockResolvedValue({ ...allOnPrefs, comments: false, emailEnabled: true });
+    const view = await service.updatePreferences(USER_B, {
+      preferences: { comments: false },
+      channels: { email: true },
+    });
+    expect(mockUpdatePreferences).toHaveBeenCalledWith(USER_B, { comments: false, emailEnabled: true });
+    expect(view.preferences.comments).toBe(false);
+    expect(view.channels.email).toBe(true);
   });
 });

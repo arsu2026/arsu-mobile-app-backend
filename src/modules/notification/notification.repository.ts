@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { NotificationType, Prisma } from '@prisma/client';
 import { prisma } from '../../prisma';
 
 const actorSelect = {
@@ -53,4 +53,38 @@ export async function deleteOne(recipientId: string, id: string) {
 
 export async function deleteAll(recipientId: string) {
   return prisma.notification.deleteMany({ where: { recipientId } });
+}
+
+export async function createNotification(data: {
+  recipientId: string;
+  actorId: string;
+  type: NotificationType;
+  entityId?: string | null;
+  message?: string | null;
+}) {
+  return prisma.notification.create({
+    data: {
+      recipientId: data.recipientId,
+      actorId: data.actorId,
+      type: data.type,
+      entityId: data.entityId ?? null,
+      message: data.message ?? null,
+    },
+  });
+}
+
+export async function ensurePreferences(profileId: string) {
+  return prisma.notificationPreference.upsert({
+    where: { profileId },
+    create: { profileId },
+    update: {},
+  });
+}
+
+export async function updatePreferences(
+  profileId: string,
+  data: Prisma.NotificationPreferenceUpdateInput,
+) {
+  await ensurePreferences(profileId);
+  return prisma.notificationPreference.update({ where: { profileId }, data });
 }
