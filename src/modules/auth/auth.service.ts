@@ -1,6 +1,7 @@
 import type { AuthError, Session, User } from '@supabase/supabase-js';
 import { supabaseClient, supabaseAdmin } from '../../config/supabase.config';
 import { AppError, ConflictError, UnauthorizedError } from '../../common/errors';
+import { joinFullName } from '../../common/utils/display-mapper.util';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Auth Service — business logic for Supabase email authentication
@@ -14,6 +15,14 @@ import { AppError, ConflictError, UnauthorizedError } from '../../common/errors'
 export interface AuthResult {
   user: User | null;
   session: Session | null;
+}
+
+export interface SignupInput {
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  gender?: import('@prisma/client').Gender;
 }
 
 /**
@@ -59,8 +68,17 @@ function mapAuthError(error: AuthError): AppError {
  * default), `session` is null and the user must confirm via the emailed link
  * before logging in. When it is disabled, a session is returned immediately.
  */
-export async function signUpWithEmail(email: string, password: string): Promise<AuthResult> {
-  const { data, error } = await supabaseClient.auth.signUp({ email, password });
+export async function signUpWithEmail(input: SignupInput): Promise<AuthResult> {
+  const fullName = joinFullName(input.firstName, input.lastName);
+  const { data, error } = await supabaseClient.auth.signUp({
+    email: input.email,
+    password: input.password,
+    options: {
+      data: {
+        ...(fullName && { full_name: fullName }),
+      },
+    },
+  });
   if (error) throw mapAuthError(error);
   return { user: data.user, session: data.session };
 }

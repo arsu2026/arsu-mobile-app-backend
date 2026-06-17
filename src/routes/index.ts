@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { authRouter } from '../modules/auth/auth.routes';
+import { feedRouter } from '../modules/feed/feed.routes';
+import { mediaRouter } from '../modules/media/media.routes';
 import { notificationRouter } from '../modules/notification/notification.routes';
 import { postRouter } from '../modules/post/post.routes';
 import { profileRouter } from '../modules/profile/profile.routes';
@@ -17,6 +19,8 @@ const router = Router();
 // ── Feature Modules ───────────────────────────────────────────────────────────
 router.use('/auth', authRouter);
 router.use('/profile', profileRouter);
+router.use('/feed', feedRouter);
+router.use('/media', mediaRouter);
 router.use('/search', searchRouter);
 router.use('/settings', settingsRouter);
 router.use('/posts', postRouter);

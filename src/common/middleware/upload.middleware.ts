@@ -35,3 +35,27 @@ export function uploadPostImages(req: Request, res: Response, next: NextFunction
     next();
   });
 }
+
+function handleSingleUpload(fieldName: string) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    upload.single(fieldName)(req, res, (err: unknown) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          const message =
+            err.code === 'LIMIT_FILE_SIZE'
+              ? 'Image must be 5 MB or smaller'
+              : 'Image upload failed';
+          return next(new BadRequestError(message));
+        }
+        return next(err);
+      }
+      next();
+    });
+  };
+}
+
+/** Parse a single image from the `file` multipart field into req.file. */
+export const uploadSingleImage = handleSingleUpload('file');
+
+/** Parse a single avatar image from the `avatar` multipart field into req.file. */
+export const uploadAvatarImage = handleSingleUpload('avatar');

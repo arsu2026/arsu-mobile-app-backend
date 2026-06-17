@@ -2,6 +2,7 @@ import type { ExploreCategory, PostPrivacy, PostType, Prisma } from '@prisma/cli
 import { prisma } from '../../prisma';
 
 const mediaInclude = {
+  author: { select: { id: true, fullName: true, avatarUrl: true } },
   media: { orderBy: { position: 'asc' } },
 } satisfies Prisma.PostInclude;
 
@@ -129,4 +130,20 @@ export async function isAcceptedFollower(viewerId: string, authorId: string): Pr
     where: { followerId_followingId: { followerId: viewerId, followingId: authorId } },
   });
   return row?.status === 'ACCEPTED';
+}
+
+export async function findLikedPostIds(userId: string, postIds: string[]) {
+  if (postIds.length === 0) return [];
+  const rows = await prisma.postLike.findMany({
+    where: { userId, postId: { in: postIds } },
+    select: { postId: true },
+  });
+  return rows.map((r) => r.postId);
+}
+
+export async function isPostLikedByUser(userId: string, postId: string): Promise<boolean> {
+  const row = await prisma.postLike.findUnique({
+    where: { userId_postId: { userId, postId } },
+  });
+  return !!row;
 }

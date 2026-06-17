@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabaseAuthGuard, optionalSupabaseAuthGuard } from '../../common/guards';
 import { validateBody, validateQuery } from '../../common/middleware/validate.middleware';
+import { uploadAvatarImage } from '../../common/middleware/upload.middleware';
 import { UpdateIntroDto } from './dto/update-intro.dto';
 import { UpdatePrivacyDto } from './dto/update-privacy.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -189,6 +190,28 @@ router.get('/follow-requests', supabaseAuthGuard, profileController.getFollowReq
  *             schema: { $ref: '#/components/schemas/ErrorResponse' }
  */
 router.post('/me/heartbeat', supabaseAuthGuard, profileController.heartbeat);
+
+/**
+ * @openapi
+ * /profile/me:
+ *   get:
+ *     tags: [Profile]
+ *     summary: Get the authenticated user's profile
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/me', supabaseAuthGuard, profileController.getMyProfile);
+
+/**
+ * @openapi
+ * /profile/avatar:
+ *   post:
+ *     tags: [Profile]
+ *     summary: Upload the current user's avatar image
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post('/avatar', supabaseAuthGuard, uploadAvatarImage, profileController.uploadAvatar);
 
 /**
  * @openapi

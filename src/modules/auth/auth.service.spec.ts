@@ -34,28 +34,32 @@ describe('auth.service', () => {
       const session = { access_token: 'a', refresh_token: 'r' };
       mockSignUp.mockResolvedValue({ data: { user, session }, error: null });
 
-      const result = await signUpWithEmail('user@example.com', 'strongpass123');
+      const result = await signUpWithEmail({
+        email: 'user@example.com',
+        password: 'strongpass123',
+      });
 
       expect(mockSignUp).toHaveBeenCalledWith({
         email: 'user@example.com',
         password: 'strongpass123',
+        options: { data: {} },
       });
       expect(result).toEqual({ user, session });
     });
 
     it('maps email_exists to a 409 ConflictError', async () => {
       mockSignUp.mockResolvedValue({ data: {}, error: authError('email_exists', 422) });
-      await expect(signUpWithEmail('u@e.com', 'pw')).rejects.toBeInstanceOf(ConflictError);
+      await expect(signUpWithEmail({ email: 'u@e.com', password: 'pw' })).rejects.toBeInstanceOf(ConflictError);
     });
 
     it('maps user_already_exists to a 409 ConflictError', async () => {
       mockSignUp.mockResolvedValue({ data: {}, error: authError('user_already_exists') });
-      await expect(signUpWithEmail('u@e.com', 'pw')).rejects.toMatchObject({ statusCode: 409 });
+      await expect(signUpWithEmail({ email: 'u@e.com', password: 'pw' })).rejects.toMatchObject({ statusCode: 409 });
     });
 
     it('maps weak_password to a 422 error', async () => {
       mockSignUp.mockResolvedValue({ data: {}, error: authError('weak_password', 422) });
-      await expect(signUpWithEmail('u@e.com', 'pw')).rejects.toMatchObject({
+      await expect(signUpWithEmail({ email: 'u@e.com', password: 'pw' })).rejects.toMatchObject({
         statusCode: 422,
         code: 'WEAK_PASSWORD',
       });
@@ -66,7 +70,7 @@ describe('auth.service', () => {
         data: {},
         error: authError('over_email_send_rate_limit', 429),
       });
-      await expect(signUpWithEmail('u@e.com', 'pw')).rejects.toMatchObject({ statusCode: 429 });
+      await expect(signUpWithEmail({ email: 'u@e.com', password: 'pw' })).rejects.toMatchObject({ statusCode: 429 });
     });
 
     it('falls back to the Supabase status and uppercased code for unknown errors', async () => {
@@ -74,7 +78,7 @@ describe('auth.service', () => {
         data: {},
         error: authError('some_new_code', 418),
       });
-      await expect(signUpWithEmail('u@e.com', 'pw')).rejects.toMatchObject({
+      await expect(signUpWithEmail({ email: 'u@e.com', password: 'pw' })).rejects.toMatchObject({
         statusCode: 418,
         code: 'SOME_NEW_CODE',
       });
@@ -85,7 +89,7 @@ describe('auth.service', () => {
         data: {},
         error: authError('over_request_rate_limit', 429),
       });
-      await expect(signUpWithEmail('u@e.com', 'pw')).rejects.toMatchObject({ statusCode: 429 });
+      await expect(signUpWithEmail({ email: 'u@e.com', password: 'pw' })).rejects.toMatchObject({ statusCode: 429 });
     });
 
     it('defaults a malformed error (no code/status) to 400 SUPABASE_AUTH_ERROR', async () => {
@@ -93,7 +97,7 @@ describe('auth.service', () => {
         data: {},
         error: { name: 'AuthApiError', message: 'something opaque' },
       });
-      await expect(signUpWithEmail('u@e.com', 'pw')).rejects.toMatchObject({
+      await expect(signUpWithEmail({ email: 'u@e.com', password: 'pw' })).rejects.toMatchObject({
         statusCode: 400,
         code: 'SUPABASE_AUTH_ERROR',
       });

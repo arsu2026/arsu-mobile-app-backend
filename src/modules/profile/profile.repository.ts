@@ -217,12 +217,31 @@ export async function createNotification(data: {
   return prisma.notification.create({ data });
 }
 
+export async function updateAvatarUrl(userId: string, avatarUrl: string) {
+  return prisma.profile.update({
+    where: { id: userId },
+    data: { avatarUrl },
+  });
+}
+
 export async function createPost(data: Prisma.PostCreateInput) {
-  return prisma.post.create({ data });
+  return prisma.post.create({
+    data,
+    include: {
+      author: { select: { id: true, fullName: true, avatarUrl: true } },
+      media: { orderBy: { position: 'asc' } },
+    },
+  });
 }
 
 export async function findPostById(postId: string) {
-  return prisma.post.findUnique({ where: { id: postId } });
+  return prisma.post.findUnique({
+    where: { id: postId },
+    include: {
+      author: { select: { id: true, fullName: true, avatarUrl: true } },
+      media: { orderBy: { position: 'asc' } },
+    },
+  });
 }
 
 export async function listPosts(
@@ -237,10 +256,23 @@ export async function listPosts(
       skip,
       take,
       orderBy: { createdAt: 'desc' },
+      include: {
+        author: { select: { id: true, fullName: true, avatarUrl: true } },
+        media: { orderBy: { position: 'asc' } },
+      },
     }),
     prisma.post.count({ where: { authorId, ...where } }),
   ]);
   return { rows, total };
+}
+
+export async function findLikedPostIds(userId: string, postIds: string[]) {
+  if (postIds.length === 0) return [];
+  const rows = await prisma.postLike.findMany({
+    where: { userId, postId: { in: postIds } },
+    select: { postId: true },
+  });
+  return rows.map((r) => r.postId);
 }
 
 export async function pinPost(userId: string, postId: string) {

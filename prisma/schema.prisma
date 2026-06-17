@@ -152,6 +152,10 @@ model Profile {
   accountSettings UserAccountSettings?
   sessions        UserSession[]
   searchHistory   SearchHistory[]
+  postLikes       PostLike[]
+  comments        Comment[]
+  commentLikes    CommentLike[]
+  postShares      PostShare[]
 
   @@index([fullName])
   @@index([location])
@@ -222,6 +226,9 @@ model Post {
   isLongFormVideo Boolean          @default(false) @map("is_long_form_video")
   category        ExploreCategory? @map("category")
   viewCount       Int              @default(0) @map("view_count")
+  likeCount       Int              @default(0) @map("like_count")
+  commentCount    Int              @default(0) @map("comment_count")
+  shareCount      Int              @default(0) @map("share_count")
   createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -229,6 +236,9 @@ model Post {
   pinnedBy  Profile?      @relation("PinnedPost")
   hashtags  PostHashtag[]
   media     PostMedia[]
+  likes     PostLike[]
+  comments  Comment[]
+  shares    PostShare[]
 
   @@index([authorId, createdAt(sort: Desc)])
   @@index([authorId, isLongFormVideo, createdAt(sort: Desc)])
@@ -364,4 +374,67 @@ model UserContact {
   @@unique([userId, contactUserId])
   @@index([userId])
   @@map("user_contacts")
+}
+
+/// A user's like on a post. Uniqueness prevents duplicate likes.
+model PostLike {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([postId])
+  @@map("post_likes")
+}
+
+/// Top-level comment on a post.
+model Comment {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  content   String   @db.Text
+  likeCount Int      @default(0) @map("like_count")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  post   Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author Profile       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes  CommentLike[]
+
+  @@index([postId, createdAt(sort: Desc)])
+  @@map("comments")
+}
+
+/// A user's like on a comment.
+model CommentLike {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  commentId String   @map("comment_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user    Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@index([commentId])
+  @@map("comment_likes")
+}
+
+/// Records that a user shared a post (increments share_count on the post).
+model PostShare {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId, postId])
+  @@map("post_shares")
 }

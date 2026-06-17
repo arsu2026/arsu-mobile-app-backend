@@ -14,6 +14,8 @@ const mockListPostsByAuthor = repo.listPostsByAuthor as jest.Mock;
 const mockSyncPostHashtags = repo.syncPostHashtags as jest.Mock;
 const mockFindBlockBetween = repo.findBlockBetween as jest.Mock;
 const mockIsAcceptedFollower = repo.isAcceptedFollower as jest.Mock;
+const mockFindLikedPostIds = repo.findLikedPostIds as jest.Mock;
+const mockIsPostLikedByUser = repo.isPostLikedByUser as jest.Mock;
 const mockUploadImage = storage.uploadImage as jest.Mock;
 const mockDeleteImages = storage.deleteImages as jest.Mock;
 
@@ -32,13 +34,21 @@ const basePost = {
   thumbnailUrl: null,
   media: [],
   viewCount: 0,
+  likeCount: 0,
+  commentCount: 0,
+  shareCount: 0,
   isLongFormVideo: false,
   createdAt: new Date('2026-01-01'),
   updatedAt: new Date('2026-01-01'),
+  author: { id: USER_A, fullName: 'Test User', avatarUrl: null },
 };
 
 describe('post.service', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindLikedPostIds.mockResolvedValue([]);
+    mockIsPostLikedByUser.mockResolvedValue(false);
+  });
 
   describe('createPost', () => {
     it('creates a TEXT post and extracts hashtags', async () => {

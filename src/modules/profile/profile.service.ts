@@ -7,12 +7,19 @@ import {
 } from '../../common/errors';
 import { buildPaginationMeta } from '../../common/utils/response.util';
 import type { PaginationMeta } from '../../common/utils/response.util';
+import type { PostView } from '../../common/types/post-view.types';
+import { mapPostsToViews, mapPostToView } from '../../common/utils/post-mapper.util';
+import {
+  joinFullName,
+  mapGenderLabel,
+  splitFullName,
+} from '../../common/utils/display-mapper.util';
+import * as storage from '../../common/storage/storage.service';
 import * as repo from './profile.repository';
 import type {
   BasicUserInfo,
   FollowRequestView,
   FriendCardUser,
-  PostView,
   PrivacySettingsView,
   ProfileIntro,
   ProfileView,
@@ -52,10 +59,13 @@ function toFriendCardUser(
   isFollowing: boolean,
 ): FriendCardUser {
   const presence = toPresence(user.lastActiveAt);
+  const { firstName, lastName } = splitFullName(user.fullName);
   return {
     id: user.id,
     username: user.username,
     fullName: user.fullName,
+    firstName,
+    lastName,
     avatarUrl: user.avatarUrl,
     isFollowing,
     isOnline: presence.isOnline,
@@ -129,20 +139,21 @@ function buildPostPrivacyFilter(
   return { OR: [{ privacy: 'PUBLIC' }] };
 }
 
-function mapPost(post: Awaited<ReturnType<typeof repo.findPostById>>): PostView {
-  if (!post) throw new NotFoundError('Post');
-  return {
-    id: post.id,
-    authorId: post.authorId,
-    content: post.content,
-    postType: post.postType,
-    privacy: post.privacy,
-    mediaUrl: post.mediaUrl,
-    thumbnailUrl: post.thumbnailUrl,
-    isLongFormVideo: post.isLongFormVideo,
-    createdAt: post.createdAt.toISOString(),
-    updatedAt: post.updatedAt.toISOString(),
-  };
+function mapPost(
+  post: NonNullable<Awaited<ReturnType<typeof repo.findPostById>>>,
+  isLiked = false,
+): PostView {
+  return mapPostToView(post, isLiked);
+}
+
+async function mapPostsForViewer(
+  posts: Array<NonNullable<Awaited<ReturnType<typeof repo.findPostById>>>>,
+  viewerId?: string,
+): Promise<PostView[]> {
+  const likedIds = viewerId
+    ? new Set(await repo.findLikedPostIds(viewerId, posts.map((p) => p.id)))
+    : new Set<string>();
+  return mapPostsToViews(posts, likedIds);
 }
 
 async function mapBasicUsers(
@@ -162,16 +173,21 @@ async function mapBasicUsers(
       ? await repo.findFollowerIdsOfTargets(viewerId, ids)
       : [];
 
-  return users.map((user) => ({
-    id: user.id,
-    username: user.username,
-    fullName: user.fullName,
-    avatarUrl: user.avatarUrl,
-    isFollowing: followingIds.includes(user.id),
-    ...(includeFollowingBack && {
-      isFollowingBack: followingBackIds.includes(user.id),
-    }),
-  }));
+  return users.map((user) => {
+    const { firstName, lastName } = splitFullName(user.fullName);
+    return {
+      id: user.id,
+      username: user.username,
+      fullName: user.fullName,
+      firstName,
+      lastName,
+      avatarUrl: user.avatarUrl,
+      isFollowing: followingIds.includes(user.id),
+      ...(includeFollowingBack && {
+        isFollowingBack: followingBackIds.includes(user.id),
+      }),
+    };
+  });
 }
 
 export async function getProfile(
@@ -201,12 +217,15 @@ export async function getProfile(
     id: profile.id,
     username: profile.username,
     fullName: profile.fullName,
+    firstName: splitFullName(profile.fullName).firstName,
+    lastName: splitFullName(profile.fullName).lastName,
     bio: profile.bio,
     avatarUrl: profile.avatarUrl,
     coverUrl: profile.coverUrl,
     website: profile.website,
     dateOfBirth: profile.dateOfBirth?.toISOString().slice(0, 10) ?? null,
     gender: profile.gender,
+    genderLabel: mapGenderLabel(profile.gender),
     relationshipStatus: profile.relationshipStatus,
     location: profile.location,
     followerCount,
@@ -219,6 +238,10 @@ export async function getProfile(
   };
 }
 
+export async function getMyProfile(userId: string): Promise<ProfileView> {
+  return getProfile(userId, userId);
+}
+
 export async function updateProfile(
   userId: string,
   input: UpdateProfileInput,
@@ -226,12 +249,48 @@ export async function updateProfile(
   assertValidUserId(userId);
   await ensureProfileExists(userId);
 
+  const data: UpdateProfileInput = { ...input };
+  if (input.firstName !== undefined || input.lastName !== undefined) {
+    const current = await repo.findProfileById(userId);
+    const { firstName, lastName } = splitFullName(current?.fullName);
+    const joined = joinFullName(
+      input.firstName ?? firstName ?? undefined,
+      input.lastName ?? lastName ?? undefined,
+    );
+    if (joined) data.fullName = joined;
+    delete data.firstName;
+    delete data.lastName;
+  }
+
   if (input.username) {
     const conflict = await repo.findUsernameConflict(input.username, userId);
     if (conflict) throw new ConflictError('Username is already taken');
   }
 
-  await repo.updateProfile(userId, input);
+  await repo.updateProfile(userId, data);
+  return getProfile(userId, userId);
+}
+
+export async function bootstrapSignupProfile(
+  userId: string,
+  input: { firstName?: string; lastName?: string; gender?: import('@prisma/client').Gender },
+): Promise<void> {
+  const fullName = joinFullName(input.firstName, input.lastName);
+  if (!fullName && !input.gender) return;
+  await repo.updateProfile(userId, {
+    ...(fullName && { fullName }),
+    ...(input.gender && { gender: input.gender }),
+  });
+}
+
+export async function uploadAvatar(
+  userId: string,
+  file: { buffer: Buffer; mimetype: string },
+): Promise<ProfileView> {
+  assertValidUserId(userId);
+  await ensureProfileExists(userId);
+  const avatarUrl = await storage.uploadImage(file.buffer, file.mimetype, userId, 'avatars');
+  await repo.updateAvatarUrl(userId, avatarUrl);
   return getProfile(userId, userId);
 }
 
@@ -280,7 +339,7 @@ export async function getUserPosts(
   const { rows, total } = await repo.listPosts(userId, privacyFilter, skip, limit);
 
   return {
-    posts: rows.map((p) => mapPost(p)),
+    posts: await mapPostsForViewer(rows, viewerId),
     meta: buildPaginationMeta(total, page, limit),
   };
 }
@@ -314,7 +373,7 @@ export async function getUserVideos(
   const { rows, total } = await repo.listPosts(userId, privacyFilter, skip, limit);
 
   return {
-    videos: rows.map((p) => mapPost(p)),
+    videos: await mapPostsForViewer(rows, viewerId),
     meta: buildPaginationMeta(total, page, limit),
   };
 }
