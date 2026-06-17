@@ -15,6 +15,7 @@ export interface NotificationView {
   message: string | null;
   isRead: boolean;
   createdAt: string;
+  entityPreview?: { postId: string; thumbnailUrl: string | null; snippet: string | null } | null;
 }
 
 export interface NotificationPreferencesView {

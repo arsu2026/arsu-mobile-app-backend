@@ -8,6 +8,8 @@ import type {
   NotificationView,
   UpdateNotificationPrefsInput,
 } from './notification.types';
+import { fetchPostPreviews } from '../../common/utils/post-preview.util';
+import type { PostPreview } from '../../common/utils/post-preview.util';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -20,7 +22,12 @@ function assertValidId(id: string): void {
 
 type NotificationRow = NonNullable<Awaited<ReturnType<typeof repo.findOwned>>>;
 
-function mapNotification(row: NotificationRow): NotificationView {
+const POST_PREVIEW_TYPES: NotificationType[] = ['LIKE', 'COMMENT', 'SHARE', 'MENTION'];
+
+function mapNotification(
+  row: NotificationRow,
+  entityPreview: NotificationView['entityPreview'] = null,
+): NotificationView {
   return {
     id: row.id,
     type: row.type,
@@ -34,6 +41,7 @@ function mapNotification(row: NotificationRow): NotificationView {
     message: row.message,
     isRead: row.isRead,
     createdAt: row.createdAt.toISOString(),
+    entityPreview,
   };
 }
 
@@ -44,10 +52,21 @@ export async function getNotifications(
 ): Promise<{ notifications: NotificationView[]; meta: PaginationMeta }> {
   const skip = (page - 1) * limit;
   const { rows, total } = await repo.listByRecipient(recipientId, skip, limit);
-  return {
-    notifications: rows.map(mapNotification),
-    meta: buildPaginationMeta(total, page, limit),
-  };
+
+  const postIds = rows
+    .filter((r) => POST_PREVIEW_TYPES.includes(r.type) && r.entityId)
+    .map((r) => r.entityId as string);
+  const previews = await fetchPostPreviews(postIds);
+
+  const notifications = rows.map((row) => {
+    const preview: PostPreview | null =
+      POST_PREVIEW_TYPES.includes(row.type) && row.entityId
+        ? previews.get(row.entityId) ?? null
+        : null;
+    return mapNotification(row, preview);
+  });
+
+  return { notifications, meta: buildPaginationMeta(total, page, limit) };
 }
 
 export async function getUnreadCount(recipientId: string): Promise<{ count: number }> {

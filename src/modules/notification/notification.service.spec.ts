@@ -6,6 +6,7 @@ jest.mock('../../common/utils/post-preview.util', () => ({
 import { BadRequestError, NotFoundError } from '../../common/errors';
 import * as repo from './notification.repository';
 import * as service from './notification.service';
+import { fetchPostPreviews } from '../../common/utils/post-preview.util';
 
 const mockListByRecipient = repo.listByRecipient as jest.Mock;
 const mockCountUnread = repo.countUnread as jest.Mock;
@@ -17,6 +18,7 @@ const mockDeleteAll = repo.deleteAll as jest.Mock;
 const mockEnsurePreferences = repo.ensurePreferences as jest.Mock;
 const mockUpdatePreferences = repo.updatePreferences as jest.Mock;
 const mockCreateNotification = repo.createNotification as jest.Mock;
+const mockFetchPreviews = fetchPostPreviews as jest.Mock;
 
 const RECIPIENT = '11111111-1111-4111-8111-111111111111';
 const NOTIF_ID = '33333333-3333-4333-8333-333333333333';
@@ -59,6 +61,7 @@ describe('notification.service', () => {
           message: 'started following you',
           isRead: false,
           createdAt: '2026-06-16T10:00:00.000Z',
+          entityPreview: null,
         },
       ]);
       expect(result.meta).toMatchObject({ page: 1, limit: 20, total: 1, totalPages: 1 });
@@ -233,5 +236,30 @@ describe('notification.service preferences', () => {
     expect(mockUpdatePreferences).toHaveBeenCalledWith(USER_B, { comments: false, emailEnabled: true });
     expect(view.preferences.comments).toBe(false);
     expect(view.channels.email).toBe(true);
+  });
+});
+
+describe('notification.service getNotifications entityPreview', () => {
+  const actor = { id: USER_A, username: 'alice', fullName: 'Alice', avatarUrl: null };
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('attaches a preview to post-type notifications and null to follows', async () => {
+    mockListByRecipient.mockResolvedValue({
+      rows: [
+        { id: 'n1', type: 'LIKE', actor, entityId: 'p1', message: 'liked your post', isRead: false, createdAt: new Date('2026-01-01') },
+        { id: 'n2', type: 'FOLLOW', actor, entityId: 'f1', message: 'followed you', isRead: false, createdAt: new Date('2026-01-02') },
+      ],
+      total: 2,
+    });
+    mockFetchPreviews.mockResolvedValue(
+      new Map([['p1', { postId: 'p1', thumbnailUrl: 'thumb1', snippet: 'hello' }]]),
+    );
+
+    const result = await service.getNotifications(USER_B, 1, 20);
+
+    expect(mockFetchPreviews).toHaveBeenCalledWith(['p1']);
+    expect(result.notifications[0].entityPreview).toEqual({ postId: 'p1', thumbnailUrl: 'thumb1', snippet: 'hello' });
+    expect(result.notifications[1].entityPreview).toBeNull();
   });
 });
