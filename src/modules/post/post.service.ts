@@ -2,10 +2,12 @@ import type { ExploreCategory, PostPrivacy, Prisma } from '@prisma/client';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../common/errors';
 import { buildPaginationMeta } from '../../common/utils/response.util';
 import type { PaginationMeta } from '../../common/utils/response.util';
+import type { PostView } from '../../common/types/post-view.types';
+import { mapPostToView, mapPostsToViews } from '../../common/utils/post-mapper.util';
 import * as storage from '../../common/storage/storage.service';
 import { extractHashtags } from './hashtag.util';
 import * as repo from './post.repository';
-import type { CreatePostInput, PostView, UpdatePostInput } from './post.types';
+import type { CreatePostInput, UpdatePostInput } from './post.types';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -15,22 +17,16 @@ function assertValidUuid(id: string): void {
 
 type PostWithMedia = NonNullable<Awaited<ReturnType<typeof repo.findPostById>>>;
 
-function mapPost(post: PostWithMedia): PostView {
-  return {
-    id: post.id,
-    authorId: post.authorId,
-    content: post.content,
-    postType: post.postType,
-    privacy: post.privacy,
-    category: post.category,
-    mediaUrl: post.mediaUrl,
-    thumbnailUrl: post.thumbnailUrl,
-    media: post.media.map((m) => ({ id: m.id, url: m.url, position: m.position })),
-    viewCount: post.viewCount,
-    isLongFormVideo: post.isLongFormVideo,
-    createdAt: post.createdAt.toISOString(),
-    updatedAt: post.updatedAt.toISOString(),
-  };
+async function mapPost(post: PostWithMedia, viewerId?: string): Promise<PostView> {
+  const isLiked = viewerId ? await repo.isPostLikedByUser(viewerId, post.id) : false;
+  return mapPostToView(post, isLiked);
+}
+
+async function mapPosts(posts: PostWithMedia[], viewerId?: string): Promise<PostView[]> {
+  const likedIds = viewerId
+    ? new Set(await repo.findLikedPostIds(viewerId, posts.map((p) => p.id)))
+    : new Set<string>();
+  return mapPostsToViews(posts, likedIds);
 }
 
 async function ensureCanView(post: PostWithMedia, viewerId: string | undefined): Promise<void> {
@@ -83,7 +79,7 @@ export async function createPost(authorId: string, input: CreatePostInput): Prom
 
   await repo.syncPostHashtags(post.id, extractHashtags(content));
 
-  return mapPost(post);
+  return await mapPost(post, authorId);
 }
 
 export async function getPostById(postId: string, viewerId: string | undefined): Promise<PostView> {
@@ -91,7 +87,7 @@ export async function getPostById(postId: string, viewerId: string | undefined):
   const post = await repo.findPostById(postId);
   if (!post) throw new NotFoundError('Post');
   await ensureCanView(post, viewerId);
-  return mapPost(post);
+  return await mapPost(post, viewerId);
 }
 
 export async function listPostsByAuthor(
@@ -115,7 +111,7 @@ export async function listPostsByAuthor(
   const skip = (page - 1) * limit;
   const { rows, total } = await repo.listPostsByAuthor(authorId, where, skip, limit);
 
-  return { posts: rows.map(mapPost), meta: buildPaginationMeta(total, page, limit) };
+  return { posts: await mapPosts(rows, viewerId), meta: buildPaginationMeta(total, page, limit) };
 }
 
 export async function updatePost(
@@ -147,7 +143,7 @@ export async function updatePost(
     await repo.syncPostHashtags(postId, extractHashtags(data.content ?? null));
   }
 
-  return mapPost(updated);
+  return await mapPost(updated, userId);
 }
 
 export async function deletePost(postId: string, userId: string): Promise<void> {

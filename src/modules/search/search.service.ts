@@ -3,6 +3,7 @@ import { BadRequestError, NotFoundError } from '../../common/errors';
 import { buildPaginationMeta } from '../../common/utils/response.util';
 import type { PaginationMeta } from '../../common/utils/response.util';
 import type { BasicUserInfo } from '../profile/profile.types';
+import { splitFullName } from '../../common/utils/display-mapper.util';
 import * as repo from './search.repository';
 import type {
   ExploreItemView,
@@ -71,13 +72,18 @@ async function mapUsers(
   const ids = users.map((u) => u.id);
   const followingIds = viewerId ? await repo.findFollowingIds(viewerId, ids) : [];
 
-  return users.map((user) => ({
-    id: user.id,
-    username: user.username,
-    fullName: user.fullName,
-    avatarUrl: user.avatarUrl,
-    isFollowing: followingIds.includes(user.id),
-  }));
+  return users.map((user) => {
+    const { firstName, lastName } = splitFullName(user.fullName);
+    return {
+      id: user.id,
+      username: user.username,
+      fullName: user.fullName,
+      firstName,
+      lastName,
+      avatarUrl: user.avatarUrl,
+      isFollowing: followingIds.includes(user.id),
+    };
+  });
 }
 
 async function recordSearchIfAuthenticated(

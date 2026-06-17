@@ -14,9 +14,10 @@ export async function uploadImage(
   buffer: Buffer,
   mimetype: string,
   userId: string,
+  folder = 'posts',
 ): Promise<string> {
   const ext = MIME_EXT[mimetype] ?? 'bin';
-  const path = `${userId}/${randomUUID()}.${ext}`;
+  const path = `${userId}/${folder}/${randomUUID()}.${ext}`;
   const bucket = env.SUPABASE_POST_MEDIA_BUCKET;
 
   const { error } = await supabaseAdmin.storage

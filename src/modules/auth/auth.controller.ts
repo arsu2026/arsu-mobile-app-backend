@@ -14,6 +14,7 @@ import type { EmailLoginDto } from './dto/email-login.dto';
 import type { ForgotPasswordDto } from './dto/forgot-password.dto';
 import type { ResetPasswordDto } from './dto/reset-password.dto';
 import type { RefreshTokenDto } from './dto/refresh-token.dto';
+import * as profileService from '../profile/profile.service';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Auth Controller — thin HTTP layer over the auth service.
@@ -30,14 +31,32 @@ import type { RefreshTokenDto } from './dto/refresh-token.dto';
  * via email first; with it disabled, an active session is returned immediately.
  */
 export async function emailSignup(req: Request, res: Response): Promise<void> {
-  const { email, password } = req.body as EmailSignupDto;
-  const result = await signUpWithEmail(email, password);
+  const body = req.body as EmailSignupDto;
+  const result = await signUpWithEmail({
+    email: body.email,
+    password: body.password,
+    firstName: body.firstName,
+    lastName: body.lastName,
+    gender: body.gender,
+  });
+
+  if (result.user?.id) {
+    await profileService.bootstrapSignupProfile(result.user.id, {
+      firstName: body.firstName,
+      lastName: body.lastName,
+      gender: body.gender,
+    });
+  }
+
+  const profile = result.user?.id
+    ? await profileService.getProfile(result.user.id, result.user.id).catch(() => null)
+    : null;
 
   const message = result.session
     ? 'Account created successfully.'
     : 'Account created. Check your email to confirm your address before logging in.';
 
-  sendSuccess(res, result, { statusCode: 201, message });
+  sendSuccess(res, { ...result, profile }, { statusCode: 201, message });
 }
 
 /**
@@ -46,8 +65,11 @@ export async function emailSignup(req: Request, res: Response): Promise<void> {
 export async function emailLogin(req: Request, res: Response): Promise<void> {
   const { email, password } = req.body as EmailLoginDto;
   const result = await signInWithEmail(email, password);
+  const profile = result.user?.id
+    ? await profileService.getProfile(result.user.id, result.user.id).catch(() => null)
+    : null;
 
-  sendSuccess(res, result, { message: 'Logged in successfully.' });
+  sendSuccess(res, { ...result, profile }, { message: 'Logged in successfully.' });
 }
 
 /**

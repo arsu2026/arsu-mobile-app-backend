@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { UnauthorizedError } from '../../common/errors';
+import { BadRequestError, UnauthorizedError } from '../../common/errors';
 import { parsePaginationParams } from '../../common/utils/paginate.util';
 import { sendSuccess } from '../../common/utils/response.util';
 import type { UpdateIntroDto } from './dto/update-intro.dto';
@@ -27,12 +27,29 @@ export async function getProfile(req: Request, res: Response): Promise<void> {
   sendSuccess(res, profile);
 }
 
+export async function getMyProfile(req: Request, res: Response): Promise<void> {
+  const profile = await profileService.getMyProfile(requireUserId(req));
+  sendSuccess(res, profile);
+}
+
+export async function uploadAvatar(req: Request, res: Response): Promise<void> {
+  const file = req.file;
+  if (!file) throw new BadRequestError('An avatar image is required');
+  const profile = await profileService.uploadAvatar(requireUserId(req), {
+    buffer: file.buffer,
+    mimetype: file.mimetype,
+  });
+  sendSuccess(res, profile, { message: 'Avatar updated successfully' });
+}
+
 export async function updateProfile(req: Request, res: Response): Promise<void> {
   const userId = requireUserId(req);
   const body = req.body as UpdateProfileDto;
   const profile = await profileService.updateProfile(userId, {
     ...body,
     dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : undefined,
+    firstName: body.firstName,
+    lastName: body.lastName,
   });
   sendSuccess(res, profile, { message: 'Profile updated successfully' });
 }

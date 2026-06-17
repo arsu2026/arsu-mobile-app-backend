@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { optionalSupabaseAuthGuard, supabaseAuthGuard } from '../../common/guards';
 import { validateBody, validateQuery } from '../../common/middleware/validate.middleware';
+import { engagementRouter } from '../engagement/engagement.routes';
 import { uploadPostImages } from '../../common/middleware/upload.middleware';
 import { CreatePostDto } from './dto/create-post.dto';
 import { ListPostsDto } from './dto/list-posts.dto';
@@ -12,6 +13,8 @@ import * as postController from './post.controller';
 // ─────────────────────────────────────────────────────────────────────────────
 
 const router = Router();
+
+router.use(engagementRouter);
 
 /**
  * @openapi

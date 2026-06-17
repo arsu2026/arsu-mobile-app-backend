@@ -19,6 +19,18 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsString()
+  @MinLength(1)
+  @MaxLength(50)
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(50)
+  lastName?: string;
+
+  @IsOptional()
+  @IsString()
   @MinLength(3)
   @MaxLength(30)
   @Matches(/^[a-zA-Z0-9_]+$/, {
