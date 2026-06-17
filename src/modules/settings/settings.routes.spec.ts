@@ -3,6 +3,10 @@ import request from 'supertest';
 
 jest.mock('../../config/supabase.config');
 jest.mock('./settings.repository');
+jest.mock('../notification/notification.service', () => ({
+  getPreferences: jest.fn(),
+  updatePreferences: jest.fn(),
+}));
 
 jest.mock('../../common/utils/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
@@ -15,6 +19,7 @@ jest.mock('../../config/env.config', () => ({
 import { supabaseAdmin } from '../../config/supabase.config';
 import { errorHandler } from '../../common/middleware/error-handler.middleware';
 import * as repo from './settings.repository';
+import * as notificationService from '../notification/notification.service';
 import { settingsRouter } from './settings.routes';
 
 const mockGetUser = supabaseAdmin.auth.getUser as jest.Mock;
@@ -149,5 +154,40 @@ describe('PUT /api/v1/settings/privacy/messages', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.messagesFrom).toBe('FOLLOWERS');
+  });
+});
+
+describe('GET/PUT /api/v1/settings/notifications', () => {
+  const mockGetPreferences = notificationService.getPreferences as jest.Mock;
+  const mockUpdatePreferences = notificationService.updatePreferences as jest.Mock;
+  const prefsView = {
+    preferences: { comments: true, tags: true, reminders: false, moreActivityAboutYou: true, updatesFromFriends: true },
+    channels: { push: true, email: false, sms: false },
+  };
+
+  it('returns 401 without auth', async () => {
+    const res = await request(app).get('/api/v1/settings/notifications');
+    expect(res.status).toBe(401);
+  });
+
+  it('returns preferences for an authenticated user', async () => {
+    authAs(USER_A);
+    mockGetPreferences.mockResolvedValue(prefsView);
+    const res = await request(app)
+      .get('/api/v1/settings/notifications')
+      .set('Authorization', 'Bearer valid-token');
+    expect(res.status).toBe(200);
+    expect(res.body.data.channels.push).toBe(true);
+  });
+
+  it('updates preferences', async () => {
+    authAs(USER_A);
+    mockUpdatePreferences.mockResolvedValue({ ...prefsView, preferences: { ...prefsView.preferences, comments: false } });
+    const res = await request(app)
+      .put('/api/v1/settings/notifications')
+      .set('Authorization', 'Bearer valid-token')
+      .send({ preferences: { comments: false } });
+    expect(res.status).toBe(200);
+    expect(res.body.data.preferences.comments).toBe(false);
   });
 });

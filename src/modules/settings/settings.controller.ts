@@ -5,8 +5,10 @@ import type { ChangeEmailDto } from './dto/change-email.dto';
 import type { ChangePasswordDto } from './dto/change-password.dto';
 import type { ChangePhoneDto } from './dto/change-phone.dto';
 import type { UpdateMessagePrivacyDto } from './dto/update-message-privacy.dto';
+import type { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import type { UpdatePostPrivacyDto } from './dto/update-post-privacy.dto';
 import type { VerifyEmailChangeDto } from './dto/verify-email-change.dto';
+import * as notificationService from '../notification/notification.service';
 import * as settingsService from './settings.service';
 
 function requireUser(req: Request): { userId: string; email: string } {
@@ -112,4 +114,17 @@ export async function revokeSession(req: Request, res: Response): Promise<void> 
   const { userId } = requireUser(req);
   const result = await settingsService.revokeSession(userId, param(req, 'sessionId'));
   sendSuccess(res, result, { message: result.message });
+}
+
+export async function getNotificationPreferences(req: Request, res: Response): Promise<void> {
+  const { userId } = requireUser(req);
+  const prefs = await notificationService.getPreferences(userId);
+  sendSuccess(res, prefs);
+}
+
+export async function updateNotificationPreferences(req: Request, res: Response): Promise<void> {
+  const { userId } = requireUser(req);
+  const body = req.body as UpdateNotificationPreferencesDto;
+  const prefs = await notificationService.updatePreferences(userId, body);
+  sendSuccess(res, prefs, { message: 'Notification preferences updated' });
 }

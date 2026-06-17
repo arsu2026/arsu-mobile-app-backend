@@ -1,3 +1,8 @@
+// reflect-metadata polyfill — required by class-transformer's @Type() and
+// class-validator's @ValidateNested() (nested DTOs). Must load before any DTO
+// module is imported, so it lives in setupFiles (runs before the test modules).
+import 'reflect-metadata';
+
 // Hermetic test environment.
 //
 // These run before any application module is imported. env.config calls

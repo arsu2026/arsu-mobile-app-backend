@@ -5,6 +5,7 @@ import { ChangeEmailDto } from './dto/change-email.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ChangePhoneDto } from './dto/change-phone.dto';
 import { UpdateMessagePrivacyDto } from './dto/update-message-privacy.dto';
+import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import { UpdatePostPrivacyDto } from './dto/update-post-privacy.dto';
 import { VerifyEmailChangeDto } from './dto/verify-email-change.dto';
 import * as settingsController from './settings.controller';
@@ -433,5 +434,41 @@ router.get('/sessions', supabaseAuthGuard, settingsController.getActiveSessions)
  *             schema: { $ref: '#/components/schemas/ErrorResponse' }
  */
 router.delete('/sessions/:sessionId', supabaseAuthGuard, settingsController.revokeSession);
+
+/**
+ * @openapi
+ * /settings/notifications:
+ *   get:
+ *     tags: [Settings]
+ *     summary: Get notification preferences
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       '200': { description: Current notification preferences and channels. }
+ *       '401': { description: Missing or invalid access token. }
+ *   put:
+ *     tags: [Settings]
+ *     summary: Update notification preferences
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               preferences: { type: object }
+ *               channels: { type: object }
+ *     responses:
+ *       '200': { description: Updated notification preferences. }
+ *       '401': { description: Missing or invalid access token. }
+ *       '422': { description: Validation failed. }
+ */
+router.get('/notifications', supabaseAuthGuard, settingsController.getNotificationPreferences);
+router.put(
+  '/notifications',
+  supabaseAuthGuard,
+  validateBody(UpdateNotificationPreferencesDto),
+  settingsController.updateNotificationPreferences,
+);
 
 export { router as settingsRouter };
