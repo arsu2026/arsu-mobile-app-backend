@@ -15,6 +15,8 @@ import {
   splitFullName,
 } from '../../common/utils/display-mapper.util';
 import * as storage from '../../common/storage/storage.service';
+import { bestEffort } from '../../common/utils/side-effect.util';
+import * as activityService from '../activity-log/activity-log.service';
 import * as repo from './profile.repository';
 import type {
   BasicUserInfo,
@@ -408,6 +410,10 @@ export async function followUser(actorId: string, targetId: string) {
       ? 'sent you a follow request'
       : 'started following you',
   });
+
+  await bestEffort('follow-activity', () =>
+    activityService.recordActivity(actorId, 'USER_FOLLOWED', { entityId: targetId, entityType: 'USER' }),
+  );
 
   return {
     status: follow.status,

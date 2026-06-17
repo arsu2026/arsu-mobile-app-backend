@@ -7,6 +7,7 @@ import * as repo from './engagement.repository';
 import type { CommentView, PostLikesView, SharePostResult } from './engagement.types';
 import { bestEffort } from '../../common/utils/side-effect.util';
 import * as notificationService from '../notification/notification.service';
+import * as activityService from '../activity-log/activity-log.service';
 import { parseMentions } from './mention.util';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -91,6 +92,10 @@ export async function likePost(postId: string, userId: string) {
       entityId: post.id,
       message: 'liked your post',
     }),
+  );
+
+  await bestEffort('like-activity', () =>
+    activityService.recordActivity(userId, 'POST_LIKED', { entityId: postId, entityType: 'POST' }),
   );
 
   return mapPostToView(post, true);
@@ -186,6 +191,10 @@ export async function addComment(postId: string, userId: string, content: string
     }
   });
 
+  await bestEffort('comment-activity', () =>
+    activityService.recordActivity(userId, 'COMMENT_ADDED', { entityId: postId, entityType: 'POST' }),
+  );
+
   return mapComment(comment, false);
 }
 
@@ -237,6 +246,10 @@ export async function sharePost(postId: string, userId: string): Promise<SharePo
       entityId: post.id,
       message: 'shared your post',
     }),
+  );
+
+  await bestEffort('share-activity', () =>
+    activityService.recordActivity(userId, 'POST_SHARED', { entityId: postId, entityType: 'POST' }),
   );
 
   return {

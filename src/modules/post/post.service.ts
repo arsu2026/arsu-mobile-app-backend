@@ -5,6 +5,8 @@ import type { PaginationMeta } from '../../common/utils/response.util';
 import type { PostView } from '../../common/types/post-view.types';
 import { mapPostToView, mapPostsToViews } from '../../common/utils/post-mapper.util';
 import * as storage from '../../common/storage/storage.service';
+import { bestEffort } from '../../common/utils/side-effect.util';
+import * as activityService from '../activity-log/activity-log.service';
 import { extractHashtags } from './hashtag.util';
 import * as repo from './post.repository';
 import type { CreatePostInput, UpdatePostInput } from './post.types';
@@ -78,6 +80,10 @@ export async function createPost(authorId: string, input: CreatePostInput): Prom
   });
 
   await repo.syncPostHashtags(post.id, extractHashtags(content));
+
+  await bestEffort('post-created-activity', () =>
+    activityService.recordActivity(authorId, 'POST_CREATED', { entityId: post.id, entityType: 'POST' }),
+  );
 
   return await mapPost(post, authorId);
 }

@@ -1,5 +1,6 @@
 jest.mock('./post.repository');
 jest.mock('../../common/storage/storage.service');
+jest.mock('../activity-log/activity-log.service');
 
 import * as repo from './post.repository';
 import * as storage from '../../common/storage/storage.service';

@@ -1,4 +1,5 @@
 jest.mock('./profile.repository');
+jest.mock('../activity-log/activity-log.service');
 
 import * as repo from './profile.repository';
 import {

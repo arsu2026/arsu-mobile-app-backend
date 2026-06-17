@@ -1,8 +1,10 @@
 jest.mock('./engagement.repository');
 jest.mock('../notification/notification.service');
+jest.mock('../activity-log/activity-log.service');
 
 import * as repo from './engagement.repository';
 import * as notificationService from '../notification/notification.service';
+import * as activityService from '../activity-log/activity-log.service';
 import { likePost, addComment, sharePost } from './engagement.service';
 
 const mockFindPostForEngagement = repo.findPostForEngagement as jest.Mock;
@@ -13,6 +15,7 @@ const mockCreatePostShare = repo.createPostShare as jest.Mock;
 const mockFindPostLike = repo.findPostLike as jest.Mock;
 const mockFindProfilesByUsernames = repo.findProfilesByUsernames as jest.Mock;
 const mockEmit = notificationService.emitNotification as jest.Mock;
+const mockRecordActivity = activityService.recordActivity as jest.Mock;
 
 const LIKER = '11111111-1111-4111-8111-111111111111';
 const AUTHOR = '22222222-2222-4222-8222-222222222222';
@@ -63,6 +66,14 @@ describe('engagement notification hooks', () => {
     expect(mockEmit).toHaveBeenCalledWith(
       expect.objectContaining({ recipientId: AUTHOR, actorId: LIKER, type: 'SHARE', entityId: POST_ID }),
     );
+  });
+
+  it('records a POST_LIKED activity', async () => {
+    await likePost(POST_ID, LIKER);
+    expect(mockRecordActivity).toHaveBeenCalledWith(LIKER, 'POST_LIKED', {
+      entityId: POST_ID,
+      entityType: 'POST',
+    });
   });
 
   it('does not break the like when emitNotification rejects', async () => {
