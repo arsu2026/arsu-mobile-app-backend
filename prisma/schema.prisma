@@ -78,6 +78,10 @@ enum NotificationType {
   FOLLOW
   FOLLOW_REQUEST
   FOLLOW_ACCEPTED
+  LIKE
+  COMMENT
+  SHARE
+  MENTION
 
   @@map("notification_type")
 }
@@ -105,6 +109,34 @@ enum SearchType {
   HASHTAGS
 
   @@map("search_type")
+}
+
+enum SavedItemType {
+  POST
+  VIDEO
+  LINK
+
+  @@map("saved_item_type")
+}
+
+enum ActivityType {
+  POST_CREATED
+  POST_LIKED
+  COMMENT_ADDED
+  POST_SHARED
+  USER_FOLLOWED
+  VIDEO_WATCHED
+
+  @@map("activity_type")
+}
+
+enum SupportStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+
+  @@map("support_status")
 }
 
 // ─────────────────────────────────────────────
@@ -137,6 +169,8 @@ model Profile {
   createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   lastActiveAt       DateTime?           @map("last_active_at") @db.Timestamptz(6)
+  deletedAt          DateTime?           @map("deleted_at") @db.Timestamptz(6)
+  purgeAfter         DateTime?           @map("purge_after") @db.Timestamptz(6)
 
   privacySettings ProfilePrivacySettings?
   pinnedPost      Post?                   @relation("PinnedPost", fields: [pinnedPostId], references: [id], onDelete: SetNull)
@@ -156,6 +190,11 @@ model Profile {
   comments        Comment[]
   commentLikes    CommentLike[]
   postShares      PostShare[]
+  notificationPreference NotificationPreference?
+  savedItems             SavedItem[]
+  savedCollections       SavedCollection[]
+  activityLog            ActivityLog[]
+  supportReports         SupportReport[]
 
   @@index([fullName])
   @@index([location])
@@ -239,6 +278,7 @@ model Post {
   likes     PostLike[]
   comments  Comment[]
   shares    PostShare[]
+  savedItems SavedItem[]
 
   @@index([authorId, createdAt(sort: Desc)])
   @@index([authorId, isLongFormVideo, createdAt(sort: Desc)])
@@ -317,6 +357,10 @@ model UserAccountSettings {
   lastLoginLocation       String?   @map("last_login_location") @db.VarChar(255)
   lastLoginDevice         String?   @map("last_login_device") @db.VarChar(255)
   twoFactorEnabled        Boolean   @default(false) @map("two_factor_enabled")
+  twoFactorMethod         String?   @map("two_factor_method") @db.VarChar(10)
+  pendingTwoFactorOtp     String?   @map("pending_two_factor_otp") @db.VarChar(10)
+  pendingTwoFactorOtpExpiresAt DateTime? @map("pending_two_factor_otp_expires_at") @db.Timestamptz(6)
+  loginAlertsEnabled      Boolean   @default(true) @map("login_alerts_enabled")
   createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -437,4 +481,96 @@ model PostShare {
   @@index([postId])
   @@index([userId, postId])
   @@map("post_shares")
+}
+
+/// Per-user notification delivery preferences (one row per profile).
+model NotificationPreference {
+  profileId            String   @id @map("profile_id") @db.Uuid
+  comments             Boolean  @default(true)
+  tags                 Boolean  @default(true)
+  reminders            Boolean  @default(false)
+  moreActivityAboutYou Boolean  @default(true) @map("more_activity_about_you")
+  updatesFromFriends   Boolean  @default(true) @map("updates_from_friends")
+  pushEnabled          Boolean  @default(true) @map("push_enabled")
+  emailEnabled         Boolean  @default(false) @map("email_enabled")
+  smsEnabled           Boolean  @default(false) @map("sms_enabled")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+/// Named buckets a user can organize saved items into.
+model SavedCollection {
+  id          String      @id @default(uuid()) @db.Uuid
+  userId      String      @map("user_id") @db.Uuid
+  name        String      @db.VarChar(100)
+  description String?     @db.VarChar(500)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user  Profile     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items SavedItem[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("saved_collections")
+}
+
+/// A saved post, video, or external link, optionally filed in a collection.
+model SavedItem {
+  id               String        @id @default(uuid()) @db.Uuid
+  userId           String        @map("user_id") @db.Uuid
+  type             SavedItemType
+  postId           String?       @map("post_id") @db.Uuid
+  linkUrl          String?       @map("link_url")
+  linkTitle        String?       @map("link_title") @db.VarChar(255)
+  linkThumbnailUrl String?       @map("link_thumbnail_url")
+  collectionId     String?       @map("collection_id") @db.Uuid
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user       Profile          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post       Post?            @relation(fields: [postId], references: [id], onDelete: Cascade)
+  collection SavedCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, postId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("saved_items")
+}
+
+/// Append-only feed of a user's own activity (posts, likes, follows, etc.).
+model ActivityLog {
+  id         String       @id @default(uuid()) @db.Uuid
+  userId     String       @map("user_id") @db.Uuid
+  type       ActivityType
+  entityId   String?      @map("entity_id") @db.Uuid
+  entityType String?      @map("entity_type") @db.VarChar(30)
+  metadata   Json?
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("activity_log")
+}
+
+/// User-submitted support / abuse reports with admin response tracking.
+model SupportReport {
+  id            String        @id @default(uuid()) @db.Uuid
+  userId        String        @map("user_id") @db.Uuid
+  subject       String?       @db.VarChar(200)
+  category      String?       @db.VarChar(50)
+  description   String        @db.Text
+  status        SupportStatus @default(OPEN)
+  adminResponse String?       @map("admin_response") @db.Text
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("support_reports")
 }
