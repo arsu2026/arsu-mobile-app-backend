@@ -191,4 +191,12 @@ export async function isAcceptedFollower(viewerId: string, authorId: string): Pr
   return row?.status === 'ACCEPTED';
 }
 
+export async function findProfilesByUsernames(usernames: string[]) {
+  if (usernames.length === 0) return [];
+  return prisma.profile.findMany({
+    where: { username: { in: usernames } },
+    select: { id: true, username: true },
+  });
+}
+
 export { postWithAuthorInclude };

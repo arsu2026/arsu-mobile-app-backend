@@ -5,11 +5,19 @@ import { mapPostToView } from '../../common/utils/post-mapper.util';
 import { splitFullName } from '../../common/utils/display-mapper.util';
 import * as repo from './engagement.repository';
 import type { CommentView, PostLikesView, SharePostResult } from './engagement.types';
+import { bestEffort } from '../../common/utils/side-effect.util';
+import * as notificationService from '../notification/notification.service';
+import { parseMentions } from './mention.util';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function assertValidUuid(id: string): void {
   if (!UUID_REGEX.test(id)) throw new BadRequestError('Invalid ID format');
+}
+
+function snippet(text: string, max = 50): string {
+  const trimmed = text.trim();
+  return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max)}…`;
 }
 
 async function ensureCanViewPost(
@@ -74,8 +82,18 @@ function mapComment(
 export async function likePost(postId: string, userId: string) {
   const post = await getVisiblePost(postId, userId);
   await repo.createPostLike(userId, post.id);
-  const isLiked = true;
-  return mapPostToView(post, isLiked);
+
+  await bestEffort('like-notification', () =>
+    notificationService.emitNotification({
+      recipientId: post.authorId,
+      actorId: userId,
+      type: 'LIKE',
+      entityId: post.id,
+      message: 'liked your post',
+    }),
+  );
+
+  return mapPostToView(post, true);
 }
 
 export async function unlikePost(postId: string, userId: string) {
@@ -142,6 +160,32 @@ export async function addComment(postId: string, userId: string, content: string
   if (!trimmed) throw new BadRequestError('Comment cannot be empty');
 
   const comment = await repo.createComment(post.id, userId, trimmed);
+
+  await bestEffort('comment-notification', async () => {
+    await notificationService.emitNotification({
+      recipientId: post.authorId,
+      actorId: userId,
+      type: 'COMMENT',
+      entityId: post.id,
+      message: `commented on your post: "${snippet(trimmed)}"`,
+    });
+
+    const handles = parseMentions(trimmed);
+    if (handles.length > 0) {
+      const profiles = await repo.findProfilesByUsernames(handles);
+      for (const profile of profiles) {
+        if (profile.id === userId || profile.id === post.authorId) continue; // skip self + already-notified author
+        await notificationService.emitNotification({
+          recipientId: profile.id,
+          actorId: userId,
+          type: 'MENTION',
+          entityId: post.id,
+          message: 'mentioned you in a comment',
+        });
+      }
+    }
+  });
+
   return mapComment(comment, false);
 }
 
@@ -184,6 +228,17 @@ export async function sharePost(postId: string, userId: string): Promise<SharePo
   const post = await getVisiblePost(postId, userId);
   const updated = await repo.createPostShare(userId, post.id);
   const isLiked = !!(await repo.findPostLike(userId, post.id));
+
+  await bestEffort('share-notification', () =>
+    notificationService.emitNotification({
+      recipientId: post.authorId,
+      actorId: userId,
+      type: 'SHARE',
+      entityId: post.id,
+      message: 'shared your post',
+    }),
+  );
+
   return {
     shareCount: updated.shareCount,
     post: mapPostToView(updated, isLiked),
