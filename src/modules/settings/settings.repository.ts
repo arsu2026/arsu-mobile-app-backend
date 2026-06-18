@@ -117,3 +117,17 @@ export async function upsertCurrentSession(
 
   return createSession(userId, { ...input, isCurrent: true });
 }
+
+export async function softDeleteProfile(userId: string, deletedAt: Date, purgeAfter: Date) {
+  return prisma.profile.update({
+    where: { id: userId },
+    data: { deletedAt, purgeAfter },
+  });
+}
+
+export async function findPurgeableProfiles(now: Date) {
+  return prisma.profile.findMany({
+    where: { deletedAt: { not: null }, purgeAfter: { lt: now } },
+    select: { id: true },
+  });
+}

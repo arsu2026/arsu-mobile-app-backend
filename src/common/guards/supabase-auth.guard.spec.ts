@@ -45,6 +45,20 @@ describe('supabaseAuthGuard', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('rejects a soft-deleted account', async () => {
+    const user = {
+      id: 'user-123',
+      email: 'user@example.com',
+      role: 'authenticated',
+      app_metadata: { deleted_at: '2026-06-17T00:00:00.000Z' },
+    };
+    mockGetUser.mockResolvedValue({ data: { user }, error: null });
+    const { req, res, next } = buildCtx({ authorization: 'Bearer good-token' });
+
+    await expect(supabaseAuthGuard(req, res, next)).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('attaches the user and raw token, then calls next on a valid token', async () => {
     const user = { id: 'user-123', email: 'user@example.com', role: 'authenticated' };
     mockGetUser.mockResolvedValue({ data: { user }, error: null });

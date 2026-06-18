@@ -11,6 +11,7 @@ import type { VerifyEmailChangeDto } from './dto/verify-email-change.dto';
 import type { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
 import type { DisableTwoFactorDto } from './dto/disable-two-factor.dto';
 import type { UpdateLoginAlertsDto } from './dto/update-login-alerts.dto';
+import type { DeleteAccountDto } from './dto/delete-account.dto';
 import * as notificationService from '../notification/notification.service';
 import * as settingsService from './settings.service';
 
@@ -150,6 +151,13 @@ export async function updateLoginAlerts(req: Request, res: Response): Promise<vo
   const body = req.body as UpdateLoginAlertsDto;
   const result = await settingsService.updateLoginAlerts(userId, body.enabled);
   sendSuccess(res, result, { message: 'Login alerts updated' });
+}
+
+export async function deleteAccount(req: Request, res: Response): Promise<void> {
+  const { userId, email } = requireUser(req);
+  const body = req.body as DeleteAccountDto;
+  const result = await settingsService.deleteAccount(userId, email, body.password);
+  sendSuccess(res, result, { message: result.message });
 }
 
 export async function getNotificationPreferences(req: Request, res: Response): Promise<void> {

@@ -19,6 +19,8 @@ import type {
 } from './settings.types';
 
 const OTP_EXPIRY_MS = 15 * 60 * 1000;
+const ACCOUNT_GRACE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const ACCOUNT_BAN_DURATION = '876000h'; // ~100 years — effectively permanent
 
 function generateOtp(): string {
   return crypto.randomInt(100000, 999999).toString();
@@ -281,6 +283,31 @@ export async function disableTwoFactor(
     pendingTwoFactorOtpExpiresAt: null,
   });
   return { message: 'Two-factor authentication disabled' };
+}
+
+export async function deleteAccount(
+  userId: string,
+  email: string,
+  password: string,
+): Promise<{ message: string; purgeAfter: string }> {
+  const { error: signInError } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (signInError) throw new UnauthorizedError('Password is incorrect');
+
+  const now = new Date();
+  const purgeAfter = new Date(now.getTime() + ACCOUNT_GRACE_MS);
+
+  const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    ban_duration: ACCOUNT_BAN_DURATION,
+    app_metadata: { deleted_at: now.toISOString(), purge_after: purgeAfter.toISOString() },
+  });
+  if (banError) throw new AppError(banError.message, 502, 'ACCOUNT_DELETE_FAILED');
+
+  await repo.softDeleteProfile(userId, now, purgeAfter);
+
+  return {
+    message: 'Account scheduled for deletion. You have 30 days to contact support to restore it.',
+    purgeAfter: purgeAfter.toISOString(),
+  };
 }
 
 export async function getAccountInfo(

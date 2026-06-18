@@ -35,6 +35,10 @@ export async function supabaseAuthGuard(
     throw new UnauthorizedError('Invalid or expired access token');
   }
 
+  if (data.user.app_metadata?.deleted_at) {
+    throw new UnauthorizedError('This account has been deactivated');
+  }
+
   req.user = {
     sub: data.user.id,
     email: data.user.email ?? '',

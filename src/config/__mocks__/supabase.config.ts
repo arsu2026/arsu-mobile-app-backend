@@ -28,6 +28,7 @@ export const supabaseAdmin = {
     admin: {
       signOut: jest.fn(),
       updateUserById: jest.fn(),
+      deleteUser: jest.fn(),
     },
   },
   storage: {

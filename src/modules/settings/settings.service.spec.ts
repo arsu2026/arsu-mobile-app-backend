@@ -6,6 +6,7 @@ import * as repo from './settings.repository';
 import { BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from '../../common/errors';
 import {
   changePassword,
+  deleteAccount,
   disableTwoFactor,
   enableTwoFactor,
   getAccountInfo,
@@ -274,6 +275,31 @@ describe('settings.service', () => {
       mockUpdateAccountSettings.mockResolvedValue({ loginAlertsEnabled: false });
       const result = await updateLoginAlerts(USER_A, false);
       expect(result.enabled).toBe(false);
+    });
+  });
+
+  describe('deleteAccount', () => {
+    it('bans and soft-deletes after a correct password', async () => {
+      mockSignInWithPassword.mockResolvedValue({ error: null });
+      mockUpdateUserById.mockResolvedValue({ error: null });
+      (repo.softDeleteProfile as jest.Mock).mockResolvedValue({});
+
+      const result = await deleteAccount(USER_A, 'user@example.com', 'pass1234');
+
+      expect(mockUpdateUserById).toHaveBeenCalledWith(
+        USER_A,
+        expect.objectContaining({
+          ban_duration: expect.any(String),
+          app_metadata: expect.objectContaining({ deleted_at: expect.any(String) }),
+        }),
+      );
+      expect(repo.softDeleteProfile).toHaveBeenCalled();
+      expect(result.message).toContain('30 days');
+    });
+
+    it('rejects a wrong password', async () => {
+      mockSignInWithPassword.mockResolvedValue({ error: { message: 'bad' } });
+      await expect(deleteAccount(USER_A, 'user@example.com', 'wrong')).rejects.toBeInstanceOf(UnauthorizedError);
     });
   });
 });

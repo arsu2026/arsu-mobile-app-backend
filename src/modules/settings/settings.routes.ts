@@ -11,6 +11,7 @@ import { VerifyEmailChangeDto } from './dto/verify-email-change.dto';
 import { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
 import { DisableTwoFactorDto } from './dto/disable-two-factor.dto';
 import { UpdateLoginAlertsDto } from './dto/update-login-alerts.dto';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import * as settingsController from './settings.controller';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -539,5 +540,20 @@ router.delete('/two-factor', supabaseAuthGuard, validateBody(DisableTwoFactorDto
  */
 router.get('/login-alerts', supabaseAuthGuard, settingsController.getLoginAlerts);
 router.put('/login-alerts', supabaseAuthGuard, validateBody(UpdateLoginAlertsDto), settingsController.updateLoginAlerts);
+
+/**
+ * @openapi
+ * /settings/account:
+ *   delete:
+ *     tags: [Settings]
+ *     summary: Schedule account deletion (soft delete, 30-day grace)
+ *     description: Requires the current password. Bans the auth user and marks the profile for purge after 30 days.
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       '200': { description: Account scheduled for deletion. }
+ *       '401': { description: Missing token or incorrect password. }
+ *       '422': { description: Validation failed. }
+ */
+router.delete('/account', supabaseAuthGuard, validateBody(DeleteAccountDto), settingsController.deleteAccount);
 
 export { router as settingsRouter };
