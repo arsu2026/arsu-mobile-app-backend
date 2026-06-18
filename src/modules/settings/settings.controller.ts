@@ -10,6 +10,7 @@ import type { UpdatePostPrivacyDto } from './dto/update-post-privacy.dto';
 import type { VerifyEmailChangeDto } from './dto/verify-email-change.dto';
 import type { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
 import type { DisableTwoFactorDto } from './dto/disable-two-factor.dto';
+import type { UpdateLoginAlertsDto } from './dto/update-login-alerts.dto';
 import * as notificationService from '../notification/notification.service';
 import * as settingsService from './settings.service';
 
@@ -136,6 +137,19 @@ export async function disableTwoFactor(req: Request, res: Response): Promise<voi
   const body = req.body as DisableTwoFactorDto;
   const result = await settingsService.disableTwoFactor(userId, email, body.password);
   sendSuccess(res, result, { message: result.message });
+}
+
+export async function getLoginAlerts(req: Request, res: Response): Promise<void> {
+  const { userId } = requireUser(req);
+  const result = await settingsService.getLoginAlerts(userId);
+  sendSuccess(res, result);
+}
+
+export async function updateLoginAlerts(req: Request, res: Response): Promise<void> {
+  const { userId } = requireUser(req);
+  const body = req.body as UpdateLoginAlertsDto;
+  const result = await settingsService.updateLoginAlerts(userId, body.enabled);
+  sendSuccess(res, result, { message: 'Login alerts updated' });
 }
 
 export async function getNotificationPreferences(req: Request, res: Response): Promise<void> {

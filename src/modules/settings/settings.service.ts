@@ -383,3 +383,21 @@ export async function recordLoginSession(
   });
   await repo.upsertCurrentSession(userId, { deviceName, location, isCurrent: true });
 }
+
+export async function getLoginAlerts(
+  userId: string,
+): Promise<{ enabled: boolean; recentLogins: SessionView[] }> {
+  const profile = await ensureProfile(userId);
+  const settings = profile.accountSettings ?? (await repo.ensureAccountSettings(userId));
+  const sessions = await repo.listUserSessions(userId);
+  return { enabled: settings.loginAlertsEnabled, recentLogins: sessions.map(mapSession) };
+}
+
+export async function updateLoginAlerts(
+  userId: string,
+  enabled: boolean,
+): Promise<{ enabled: boolean }> {
+  await ensureProfile(userId);
+  const updated = await repo.updateAccountSettings(userId, { loginAlertsEnabled: enabled });
+  return { enabled: updated.loginAlertsEnabled };
+}

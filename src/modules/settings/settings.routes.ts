@@ -10,6 +10,7 @@ import { UpdatePostPrivacyDto } from './dto/update-post-privacy.dto';
 import { VerifyEmailChangeDto } from './dto/verify-email-change.dto';
 import { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
 import { DisableTwoFactorDto } from './dto/disable-two-factor.dto';
+import { UpdateLoginAlertsDto } from './dto/update-login-alerts.dto';
 import * as settingsController from './settings.controller';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -516,5 +517,27 @@ router.post('/two-factor/verify', supabaseAuthGuard, validateBody(VerifyTwoFacto
  *       '422': { description: Validation failed. }
  */
 router.delete('/two-factor', supabaseAuthGuard, validateBody(DisableTwoFactorDto), settingsController.disableTwoFactor);
+
+/**
+ * @openapi
+ * /settings/login-alerts:
+ *   get:
+ *     tags: [Settings]
+ *     summary: Get login-alert preference and recent logins
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       '200': { description: Login-alert flag and recent sessions. }
+ *       '401': { description: Missing or invalid access token. }
+ *   put:
+ *     tags: [Settings]
+ *     summary: Toggle login alerts
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       '200': { description: Updated flag. }
+ *       '401': { description: Missing or invalid access token. }
+ *       '422': { description: Validation failed. }
+ */
+router.get('/login-alerts', supabaseAuthGuard, settingsController.getLoginAlerts);
+router.put('/login-alerts', supabaseAuthGuard, validateBody(UpdateLoginAlertsDto), settingsController.updateLoginAlerts);
 
 export { router as settingsRouter };

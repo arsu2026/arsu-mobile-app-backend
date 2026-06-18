@@ -9,8 +9,10 @@ import {
   disableTwoFactor,
   enableTwoFactor,
   getAccountInfo,
+  getLoginAlerts,
   getPrivacySettings,
   revokeSession,
+  updateLoginAlerts,
   updateMessagePrivacy,
   verifyEmailChange,
   verifyTwoFactor,
@@ -257,6 +259,21 @@ describe('settings.service', () => {
     it('rejects a wrong password', async () => {
       mockSignInWithPassword.mockResolvedValue({ error: { message: 'bad' } });
       await expect(disableTwoFactor(USER_A, 'user@example.com', 'wrong')).rejects.toBeInstanceOf(UnauthorizedError);
+    });
+  });
+
+  describe('login alerts', () => {
+    it('returns the enabled flag and recent logins', async () => {
+      (repo.listUserSessions as jest.Mock).mockResolvedValue([]);
+      const result = await getLoginAlerts(USER_A);
+      expect(result.enabled).toBe(true);
+      expect(result.recentLogins).toEqual([]);
+    });
+
+    it('updates the enabled flag', async () => {
+      mockUpdateAccountSettings.mockResolvedValue({ loginAlertsEnabled: false });
+      const result = await updateLoginAlerts(USER_A, false);
+      expect(result.enabled).toBe(false);
     });
   });
 });
