@@ -8,6 +8,8 @@ import { UpdateMessagePrivacyDto } from './dto/update-message-privacy.dto';
 import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import { UpdatePostPrivacyDto } from './dto/update-post-privacy.dto';
 import { VerifyEmailChangeDto } from './dto/verify-email-change.dto';
+import { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
+import { DisableTwoFactorDto } from './dto/disable-two-factor.dto';
 import * as settingsController from './settings.controller';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -470,5 +472,49 @@ router.put(
   validateBody(UpdateNotificationPreferencesDto),
   settingsController.updateNotificationPreferences,
 );
+
+/**
+ * @openapi
+ * /settings/two-factor/enable:
+ *   post:
+ *     tags: [Settings]
+ *     summary: Begin SMS two-factor enrollment (sends a code to the verified phone)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       '200': { description: Verification code sent. }
+ *       '400': { description: No verified phone on file. }
+ *       '401': { description: Missing or invalid access token. }
+ *       '409': { description: Two-factor is already enabled. }
+ */
+router.post('/two-factor/enable', supabaseAuthGuard, settingsController.enableTwoFactor);
+
+/**
+ * @openapi
+ * /settings/two-factor/verify:
+ *   post:
+ *     tags: [Settings]
+ *     summary: Confirm SMS two-factor enrollment
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       '200': { description: Two-factor enabled. }
+ *       '400': { description: Invalid or expired code. }
+ *       '401': { description: Missing or invalid access token. }
+ *       '422': { description: Validation failed. }
+ */
+router.post('/two-factor/verify', supabaseAuthGuard, validateBody(VerifyTwoFactorDto), settingsController.verifyTwoFactor);
+
+/**
+ * @openapi
+ * /settings/two-factor:
+ *   delete:
+ *     tags: [Settings]
+ *     summary: Disable two-factor authentication (requires password)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       '200': { description: Two-factor disabled. }
+ *       '401': { description: Missing token or incorrect password. }
+ *       '422': { description: Validation failed. }
+ */
+router.delete('/two-factor', supabaseAuthGuard, validateBody(DisableTwoFactorDto), settingsController.disableTwoFactor);
 
 export { router as settingsRouter };

@@ -8,6 +8,8 @@ import type { UpdateMessagePrivacyDto } from './dto/update-message-privacy.dto';
 import type { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import type { UpdatePostPrivacyDto } from './dto/update-post-privacy.dto';
 import type { VerifyEmailChangeDto } from './dto/verify-email-change.dto';
+import type { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
+import type { DisableTwoFactorDto } from './dto/disable-two-factor.dto';
 import * as notificationService from '../notification/notification.service';
 import * as settingsService from './settings.service';
 
@@ -113,6 +115,26 @@ export async function getActiveSessions(req: Request, res: Response): Promise<vo
 export async function revokeSession(req: Request, res: Response): Promise<void> {
   const { userId } = requireUser(req);
   const result = await settingsService.revokeSession(userId, param(req, 'sessionId'));
+  sendSuccess(res, result, { message: result.message });
+}
+
+export async function enableTwoFactor(req: Request, res: Response): Promise<void> {
+  const { userId } = requireUser(req);
+  const result = await settingsService.enableTwoFactor(userId);
+  sendSuccess(res, result, { message: result.message });
+}
+
+export async function verifyTwoFactor(req: Request, res: Response): Promise<void> {
+  const { userId } = requireUser(req);
+  const body = req.body as VerifyTwoFactorDto;
+  const result = await settingsService.verifyTwoFactor(userId, body.code);
+  sendSuccess(res, result, { message: result.message });
+}
+
+export async function disableTwoFactor(req: Request, res: Response): Promise<void> {
+  const { userId, email } = requireUser(req);
+  const body = req.body as DisableTwoFactorDto;
+  const result = await settingsService.disableTwoFactor(userId, email, body.password);
   sendSuccess(res, result, { message: result.message });
 }
 

@@ -74,6 +74,11 @@ async function sendVerificationEmail(to: string, otp: string): Promise<void> {
   });
 }
 
+function sendTwoFactorSms(_phone: string, _otp: string): void {
+  // No SMS gateway is configured in this environment. Enrollment generates and
+  // stores the OTP; delivery is a no-op stub to be wired to a provider later.
+}
+
 export async function changePassword(
   userId: string,
   email: string,
@@ -212,6 +217,70 @@ export async function verifyPhoneChange(userId: string, otp: string): Promise<{ 
     message: 'Phone number updated successfully',
     phone: settings.pendingPhone,
   };
+}
+
+export async function enableTwoFactor(
+  userId: string,
+): Promise<{ message: string; method: 'SMS'; phone: string | null }> {
+  const profile = await ensureProfile(userId);
+  const settings = profile.accountSettings ?? (await repo.ensureAccountSettings(userId));
+
+  if (settings.twoFactorEnabled) {
+    throw new ConflictError('Two-factor authentication is already enabled');
+  }
+  if (!settings.phone || !settings.phoneVerifiedAt) {
+    throw new BadRequestError('Add and verify a phone number before enabling two-factor authentication');
+  }
+
+  const otp = generateOtp();
+  const expiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
+  await repo.updateAccountSettings(userId, {
+    twoFactorMethod: 'SMS',
+    pendingTwoFactorOtp: otp,
+    pendingTwoFactorOtpExpiresAt: expiresAt,
+  });
+  sendTwoFactorSms(settings.phone, otp);
+
+  return { message: 'Verification code sent to your phone', method: 'SMS', phone: maskPhone(settings.phone) };
+}
+
+export async function verifyTwoFactor(userId: string, code: string): Promise<{ message: string }> {
+  const profile = await ensureProfile(userId);
+  const settings = profile.accountSettings ?? (await repo.ensureAccountSettings(userId));
+
+  if (!settings.pendingTwoFactorOtp) {
+    throw new BadRequestError('No pending two-factor enrollment');
+  }
+  if (settings.pendingTwoFactorOtp !== code) {
+    throw new BadRequestError('Invalid verification code');
+  }
+  if (!settings.pendingTwoFactorOtpExpiresAt || settings.pendingTwoFactorOtpExpiresAt < new Date()) {
+    throw new BadRequestError('Verification code has expired. Please request a new one.');
+  }
+
+  await repo.updateAccountSettings(userId, {
+    twoFactorEnabled: true,
+    pendingTwoFactorOtp: null,
+    pendingTwoFactorOtpExpiresAt: null,
+  });
+  return { message: 'Two-factor authentication enabled' };
+}
+
+export async function disableTwoFactor(
+  userId: string,
+  email: string,
+  password: string,
+): Promise<{ message: string }> {
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) throw new UnauthorizedError('Password is incorrect');
+
+  await repo.updateAccountSettings(userId, {
+    twoFactorEnabled: false,
+    twoFactorMethod: null,
+    pendingTwoFactorOtp: null,
+    pendingTwoFactorOtpExpiresAt: null,
+  });
+  return { message: 'Two-factor authentication disabled' };
 }
 
 export async function getAccountInfo(

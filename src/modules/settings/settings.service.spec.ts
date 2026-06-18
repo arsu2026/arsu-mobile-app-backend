@@ -3,14 +3,17 @@ jest.mock('../../config/supabase.config');
 
 import { supabaseClient, supabaseAdmin } from '../../config/supabase.config';
 import * as repo from './settings.repository';
-import { BadRequestError, NotFoundError, UnauthorizedError } from '../../common/errors';
+import { BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from '../../common/errors';
 import {
   changePassword,
+  disableTwoFactor,
+  enableTwoFactor,
   getAccountInfo,
   getPrivacySettings,
   revokeSession,
   updateMessagePrivacy,
   verifyEmailChange,
+  verifyTwoFactor,
 } from './settings.service';
 
 const mockFindProfileById = repo.findProfileById as jest.Mock;
@@ -37,6 +40,10 @@ const baseProfile = {
     lastLoginAt: new Date('2024-06-01'),
     lastPasswordChangeAt: null,
     twoFactorEnabled: false,
+    twoFactorMethod: null,
+    pendingTwoFactorOtp: null,
+    pendingTwoFactorOtpExpiresAt: null,
+    loginAlertsEnabled: true,
     lastLoginLocation: 'New York, US',
     lastLoginDevice: 'Chrome',
   },
@@ -172,6 +179,84 @@ describe('settings.service', () => {
       mockFindSessionById.mockResolvedValue(null);
 
       await expect(revokeSession(USER_A, 'missing')).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
+  describe('enableTwoFactor', () => {
+    it('stores a pending SMS OTP when the phone is verified', async () => {
+      mockUpdateAccountSettings.mockResolvedValue({});
+      const result = await enableTwoFactor(USER_A);
+      expect(result.method).toBe('SMS');
+      expect(mockUpdateAccountSettings).toHaveBeenCalledWith(
+        USER_A,
+        expect.objectContaining({ twoFactorMethod: 'SMS', pendingTwoFactorOtp: expect.any(String) }),
+      );
+    });
+
+    it('rejects when there is no verified phone', async () => {
+      mockFindProfileById.mockResolvedValue({
+        ...baseProfile,
+        accountSettings: { ...baseProfile.accountSettings, phone: null, phoneVerifiedAt: null },
+      });
+      await expect(enableTwoFactor(USER_A)).rejects.toBeInstanceOf(BadRequestError);
+    });
+
+    it('conflicts when 2FA is already enabled', async () => {
+      mockFindProfileById.mockResolvedValue({
+        ...baseProfile,
+        accountSettings: { ...baseProfile.accountSettings, twoFactorEnabled: true },
+      });
+      await expect(enableTwoFactor(USER_A)).rejects.toBeInstanceOf(ConflictError);
+    });
+  });
+
+  describe('verifyTwoFactor', () => {
+    it('enables 2FA for a valid, unexpired code', async () => {
+      mockFindProfileById.mockResolvedValue({
+        ...baseProfile,
+        accountSettings: {
+          ...baseProfile.accountSettings,
+          pendingTwoFactorOtp: '123456',
+          pendingTwoFactorOtpExpiresAt: new Date(Date.now() + 60_000),
+        },
+      });
+      mockUpdateAccountSettings.mockResolvedValue({});
+      const result = await verifyTwoFactor(USER_A, '123456');
+      expect(result.message).toBe('Two-factor authentication enabled');
+      expect(mockUpdateAccountSettings).toHaveBeenCalledWith(
+        USER_A,
+        expect.objectContaining({ twoFactorEnabled: true }),
+      );
+    });
+
+    it('rejects an incorrect code', async () => {
+      mockFindProfileById.mockResolvedValue({
+        ...baseProfile,
+        accountSettings: {
+          ...baseProfile.accountSettings,
+          pendingTwoFactorOtp: '123456',
+          pendingTwoFactorOtpExpiresAt: new Date(Date.now() + 60_000),
+        },
+      });
+      await expect(verifyTwoFactor(USER_A, '000000')).rejects.toBeInstanceOf(BadRequestError);
+    });
+  });
+
+  describe('disableTwoFactor', () => {
+    it('disables 2FA after a correct password', async () => {
+      mockSignInWithPassword.mockResolvedValue({ error: null });
+      mockUpdateAccountSettings.mockResolvedValue({});
+      const result = await disableTwoFactor(USER_A, 'user@example.com', 'pass1234');
+      expect(result.message).toBe('Two-factor authentication disabled');
+      expect(mockUpdateAccountSettings).toHaveBeenCalledWith(
+        USER_A,
+        expect.objectContaining({ twoFactorEnabled: false }),
+      );
+    });
+
+    it('rejects a wrong password', async () => {
+      mockSignInWithPassword.mockResolvedValue({ error: { message: 'bad' } });
+      await expect(disableTwoFactor(USER_A, 'user@example.com', 'wrong')).rejects.toBeInstanceOf(UnauthorizedError);
     });
   });
 });

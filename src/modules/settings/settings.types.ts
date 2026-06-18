@@ -56,6 +56,10 @@ export interface UpdateAccountSettingsInput {
   lastLoginLocation?: string | null;
   lastLoginDevice?: string | null;
   twoFactorEnabled?: boolean;
+  twoFactorMethod?: string | null;
+  pendingTwoFactorOtp?: string | null;
+  pendingTwoFactorOtpExpiresAt?: Date | null;
+  loginAlertsEnabled?: boolean;
 }
 
 export interface CreateSessionInput {
