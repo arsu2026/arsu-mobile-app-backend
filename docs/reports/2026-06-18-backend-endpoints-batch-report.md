@@ -20,22 +20,68 @@ On top of the feature batch, this session added a **code review**, a **productio
 
 ---
 
-## 2. What shipped — the 7 subsystems
+## 2. Endpoint reference (complete brief)
 
-Mount points are registered in `src/routes/index.ts`. Paths below are relative to each module's mount prefix.
+**Conventions.** All paths are under `/api/v1` and mounted in `src/routes/index.ts` (`c027bac`). Every endpoint below requires the `supabaseAuthGuard` (Bearer access token) unless stated otherwise; on a missing/invalid token they return **401**. Success responses use the `sendSuccess` envelope `{ success: true, data, message?, meta? }`; list endpoints add `meta` (`PaginationMeta`) and accept `page` (default 1) / `limit` (default 20, max 100). Body/query validation failures return **422**. `[batch]` marks endpoints added by this branch; unmarked settings routes pre-date it and are listed for completeness.
 
-| Subsystem | Module | Status | Endpoints (new in this batch) |
-|-----------|--------|--------|-------------------------------|
-| **Notifications** | `notification` (extended) + `engagement` (emitters) | Activated | `GET /notifications` (enriched with batched `entityPreview`), `GET /notifications/unread-count`, `PATCH /notifications/read-all`, `PATCH /notifications/:id/read`, `DELETE /notifications`, `DELETE /notifications/:id`; preference gating via `emitNotification` |
-| **Settings — notifications** | `settings` (extended) | New endpoints | `GET /settings/notifications`, `PUT /settings/notifications` |
-| **Settings — security** | `settings` (extended) | New endpoints | `POST /settings/two-factor/enable`, `POST /settings/two-factor/verify`, `DELETE /settings/two-factor`, `GET /settings/login-alerts`, `PUT /settings/login-alerts`, `DELETE /settings/account` (soft-delete) + scheduled purge job |
-| **Saved** | `saved` (new) | New module | `POST /saved`, `GET /saved`, `DELETE /saved/:id`, `POST /saved/collections`, `GET /saved/collections` |
-| **Memories** | `memories` (new) | New module | `GET /memories` (on-this-day) |
-| **Activity log** | `activity-log` (new) | New module | `GET /activity-log` + event writers wired into engagement/post/profile flows |
-| **Contacts** | `contacts` (new) | New module | `POST /contacts/sync` (phone-based account discovery) |
-| **Support** | `support` (new) | New module | `POST /support/reports`, `GET /support/inbox` |
+### 2.1 Notifications — mounted at `/notifications`
+Scoped to the current user as recipient. Notifications are not created via an endpoint — they are emitted best-effort from engagement/follow flows (§2.8) through `emitNotification`, gated by the recipient's preferences (§2.2).
 
-All new routers are mounted in `c027bac` (`feat(routes): mount saved, memories, activity-log, contacts, and support routers`).
+- **`GET /notifications`** — List the user's notifications, newest first, paginated. Each item is enriched with a batched `entityPreview` (post thumbnail/snippet) via `fetchPostPreviews`. → `NotificationView[]` + `meta`. Query: `page`, `limit`.
+- **`GET /notifications/unread-count`** — Unread badge count. → `{ count }`.
+- **`PATCH /notifications/read-all`** — Mark all the user's notifications read. → message.
+- **`DELETE /notifications`** — Clear (delete) all the user's notifications. → message.
+- **`PATCH /notifications/:id/read`** — Mark one notification read. Path `id` (uuid). → updated `NotificationView`. Errors: 400 malformed id, 404 not found / not caller's.
+- **`DELETE /notifications/:id`** — Delete one notification. Path `id` (uuid). → message. Errors: 400, 404.
+
+### 2.2 Settings — mounted at `/settings`
+- **`PUT /settings/password`** — Change password; requires the current password for re-auth. Body `ChangePasswordRequest`. → message. Errors: 401 wrong current password.
+- **`PUT /settings/email`** — Start an email change; sends a 6-digit code to the new address (not applied until verified). Body `ChangeEmailRequest`. → `{ message, pendingEmail }`. Errors: 409 email already in use.
+- **`PUT /settings/email/verify`** — Confirm the email change with the 6-digit code. Body `VerifyOtpRequest`. → message. Errors: 400 invalid/expired code.
+- **`PUT /settings/phone`** — Start a phone change; sends a 6-digit code to the new number (not applied until verified). Body `ChangePhoneRequest` (`newPhone`). → `{ message, pendingPhone }` (masked). **Normalizes the number before storing `pendingPhone` and rejects un-normalizable input** (the §5.2 fix). Errors: 422.
+- **`PUT /settings/phone/verify`** — Confirm the phone change with the 6-digit code; promotes the already-normalized `pendingPhone` → `phone`. Body `VerifyOtpRequest`. → message. Errors: 400 invalid/expired code.
+- **`GET /settings/account`** — Account information. → `AccountInfoView`.
+- **`GET /settings/security`** — Security overview: 2FA status, active-session count, last-login details. → `SecurityOverviewView`.
+- **`GET /settings/privacy`** — Current privacy settings. → `PrivacySettingsView`.
+- **`PUT /settings/privacy/posts`** — Set default post visibility. Body `UpdatePostPrivacyRequest`. → updated `PrivacySettingsView`.
+- **`PUT /settings/privacy/messages`** — Set who may send direct messages. Body `UpdateMessagePrivacyRequest`. → updated `PrivacySettingsView`.
+- **`GET /settings/sessions`** — List active sessions (current session flagged). → `SessionView[]`.
+- **`DELETE /settings/sessions/:sessionId`** — Revoke a session (sign out a device). Path `sessionId` (uuid). → message. Errors: 404 session not found.
+- **`GET /settings/notifications`** `[batch]` — Current notification preferences + channels. → preferences object.
+- **`PUT /settings/notifications`** `[batch]` — Update notification preferences. Body `UpdateNotificationPreferencesDto` (`{ preferences, channels }`). → updated preferences.
+- **`POST /settings/two-factor/enable`** `[batch]` — Begin SMS 2FA enrollment; sends a code to the verified phone. → message. Errors: 400 no verified phone on file, 409 2FA already enabled.
+- **`POST /settings/two-factor/verify`** `[batch]` — Confirm SMS 2FA enrollment. Body `VerifyTwoFactorDto` (code). → message. Errors: 400 invalid/expired code.
+- **`DELETE /settings/two-factor`** `[batch]` — Disable 2FA; requires the password. Body `DisableTwoFactorDto`. → message. Errors: 401 incorrect password.
+- **`GET /settings/login-alerts`** `[batch]` — Login-alert flag + recent logins. → `{ enabled, recentLogins }`.
+- **`PUT /settings/login-alerts`** `[batch]` — Toggle login alerts. Body `UpdateLoginAlertsDto`. → updated flag.
+- **`DELETE /settings/account`** `[batch]` — Schedule account deletion (soft delete, 30-day grace); requires the password, bans the auth user, and marks the profile for purge. Body `DeleteAccountDto`. → message. Errors: 401 incorrect password. *(Purge executed by the scheduled `purge-deleted-accounts` job.)*
+
+### 2.3 Saved — mounted at `/saved` `[batch — new module]`
+- **`POST /saved/collections`** — Create a collection. Body `{ name (required), description? }`. → 201 created collection. Errors: 409 a collection with this name already exists.
+- **`GET /saved/collections`** — List the user's collections with item counts. → collections[].
+- **`POST /saved`** — Save a post, video, or link. Body `{ type: POST|VIDEO|LINK (required), postId?, linkUrl?, linkTitle?, linkThumbnailUrl?, collectionId? }`. → 201 saved item. Errors: 404 post/collection not found, 409 post already saved.
+- **`GET /saved`** — List saved items, paginated. Query `type` (post|video|link), `collection` (uuid), `page`. → items[] + meta.
+- **`DELETE /saved/:id`** — Remove a saved item. Path `id` (uuid). → message. Errors: 404 saved item not found.
+
+### 2.4 Memories — mounted at `/memories` `[batch — new module]`
+- **`GET /memories`** — "On this day": the user's past posts from this calendar day. Query `date` (MM-DD; defaults to today, UTC). → posts[]. Errors: 422 `date` not a valid MM-DD.
+
+### 2.5 Activity log — mounted at `/activity-log` `[batch — new module]`
+- **`GET /activity-log`** — The user's activity log, paginated. Query `type` (`posts|liked|comments|shares|follows|watched-videos`), `page`. → activity items[] + meta. *(Entries are written best-effort from engagement/post/profile flows.)*
+
+### 2.6 Contacts — mounted at `/contacts` `[batch — new module]`
+- **`POST /contacts/sync`** — Upload phone contacts and find matching registered users. Body `{ contacts: [{ phone (required), name? }] }` (max 1000). Phones are normalized via the shared `normalizePhone` and matched against verified phone numbers; matched users are added as contacts. → `{ syncedCount, matchedCount, matches[] }`. *(The §5.2 fix is what makes these matches actually resolve.)*
+
+### 2.7 Support — mounted at `/support` `[batch — new module]`
+- **`POST /support/reports`** — File a support report. Body `{ description (required, 1–1000 chars), subject? (≤200), category? (≤50) }`. → created `SupportReportView` (`id, subject, category, description, status, adminResponse, createdAt, updatedAt`).
+- **`GET /support/inbox`** — List the user's own reports, paginated. → reports[] + meta.
+
+### 2.8 Engagement emitters — mounted at `/posts` (notification + activity source)
+These routes pre-date the batch; the batch wired **best-effort notification + activity emission** into them (`3f07524`, `2fdbb6f`). The behaviors the batch added:
+- **`POST /posts/:postId/like`** — emits a *like* notification to the post owner.
+- **`POST /posts/:postId/comments`** — emits a *comment* notification, and parses `@mentions` (casing preserved) into *mention* notifications.
+- **`POST /posts/:postId/share`** — emits a *share* notification and records the share for the activity log.
+*(Unchanged siblings on the same router: `DELETE /posts/:postId/like`, `GET /posts/:postId/likes`, `GET /posts/:postId/comments`, `DELETE /posts/:postId/comments/:id`, `POST /posts/:postId/comments/:id/like`.)*
 
 ---
 
