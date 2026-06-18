@@ -6,6 +6,7 @@ import * as repo from './settings.repository';
 import { BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from '../../common/errors';
 import {
   changePassword,
+  changePhone,
   deleteAccount,
   disableTwoFactor,
   enableTwoFactor,
@@ -84,6 +85,29 @@ describe('settings.service', () => {
       await expect(
         changePassword(USER_A, 'user@example.com', 'wrong', 'newpass12'),
       ).rejects.toBeInstanceOf(UnauthorizedError);
+    });
+  });
+
+  describe('changePhone', () => {
+    it('normalizes the phone before storing the pending change', async () => {
+      mockUpdateAccountSettings.mockResolvedValue({});
+
+      await changePhone(USER_A, '+1 (555) 999-8888');
+
+      expect(mockUpdateAccountSettings).toHaveBeenCalledWith(
+        USER_A,
+        expect.objectContaining({ pendingPhone: '+15559998888' }),
+      );
+    });
+
+    it('rejects a phone number that cannot be normalized', async () => {
+      await expect(changePhone(USER_A, '123')).rejects.toBeInstanceOf(BadRequestError);
+      expect(mockUpdateAccountSettings).not.toHaveBeenCalled();
+    });
+
+    it('treats a differently-formatted current number as unchanged', async () => {
+      await expect(changePhone(USER_A, '+1 (555) 123-4567')).rejects.toBeInstanceOf(BadRequestError);
+      expect(mockUpdateAccountSettings).not.toHaveBeenCalled();
     });
   });
 

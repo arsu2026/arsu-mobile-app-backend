@@ -1,5 +1,5 @@
 import * as repo from './contacts.repository';
-import { normalizePhone } from './phone.util';
+import { normalizePhone } from '../../common/utils/phone.util';
 import type { ContactInput, ContactMatch, SyncContactsResult } from './contacts.types';
 
 export async function syncContacts(userId: string, contacts: ContactInput[]): Promise<SyncContactsResult> {

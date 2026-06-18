@@ -9,6 +9,7 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from '../../common/errors';
+import { normalizePhone } from '../../common/utils/phone.util';
 import * as repo from './settings.repository';
 import type {
   AccountInfoView,
@@ -172,7 +173,14 @@ export async function changePhone(
   await ensureProfile(userId);
   const settings = await repo.ensureAccountSettings(userId);
 
-  if (settings.phone === newPhone) {
+  // Store the canonical (normalized) number so contact matching, which queries
+  // by normalized phone, can find this account. See common/utils/phone.util.
+  const normalizedPhone = normalizePhone(newPhone);
+  if (!normalizedPhone) {
+    throw new BadRequestError('Please provide a valid phone number');
+  }
+
+  if (settings.phone === normalizedPhone) {
     throw new BadRequestError('New phone number must be different from your current number');
   }
 
@@ -180,14 +188,14 @@ export async function changePhone(
   const expiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
 
   await repo.updateAccountSettings(userId, {
-    pendingPhone: newPhone,
+    pendingPhone: normalizedPhone,
     pendingPhoneOtp: otp,
     pendingPhoneOtpExpiresAt: expiresAt,
   });
 
   return {
     message: 'Verification code sent to your new phone number',
-    pendingPhone: maskPhone(newPhone) ?? undefined,
+    pendingPhone: maskPhone(normalizedPhone) ?? undefined,
   };
 }
 
