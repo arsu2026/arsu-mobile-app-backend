@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { activityLogRouter } from '../modules/activity-log/activity-log.routes';
+import { adminAuthRouter } from '../modules/admin/auth/admin-auth.routes';
 import { authRouter } from '../modules/auth/auth.routes';
 import { contactsRouter } from '../modules/contacts/contacts.routes';
 import { feedRouter } from '../modules/feed/feed.routes';
@@ -22,6 +23,7 @@ import { supportRouter } from '../modules/support/support.routes';
 const router = Router();
 
 // ── Feature Modules ───────────────────────────────────────────────────────────
+router.use('/admin/auth', adminAuthRouter);
 router.use('/auth', authRouter);
 router.use('/profile', profileRouter);
 router.use('/feed', feedRouter);
