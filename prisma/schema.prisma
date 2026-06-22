@@ -10,5 +10,616 @@ datasource db {
 }
 
 // ─────────────────────────────────────────────
-// Add your models below
+// Enums
 // ─────────────────────────────────────────────
+
+enum Gender {
+  MALE
+  FEMALE
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+  OTHER
+
+  @@map("gender")
+}
+
+enum RelationshipStatus {
+  SINGLE
+  IN_A_RELATIONSHIP
+  ENGAGED
+  MARRIED
+  COMPLICATED
+  NOT_SPECIFIED
+
+  @@map("relationship_status")
+}
+
+enum VisibilityLevel {
+  PUBLIC
+  FOLLOWERS
+  ONLY_ME
+
+  @@map("visibility_level")
+}
+
+enum MessagePermission {
+  EVERYONE
+  FOLLOWERS
+  NOBODY
+
+  @@map("message_permission")
+}
+
+enum FollowStatus {
+  ACCEPTED
+  PENDING
+
+  @@map("follow_status")
+}
+
+enum PostType {
+  TEXT
+  IMAGE
+  VIDEO
+  COVER_PHOTO
+
+  @@map("post_type")
+}
+
+enum PostPrivacy {
+  PUBLIC
+  FOLLOWERS
+  ONLY_ME
+
+  @@map("post_privacy")
+}
+
+enum NotificationType {
+  FOLLOW
+  FOLLOW_REQUEST
+  FOLLOW_ACCEPTED
+  LIKE
+  COMMENT
+  SHARE
+  MENTION
+
+  @@map("notification_type")
+}
+
+enum ExploreCategory {
+  MUSIC
+  SPORTS
+  GAMING
+  EDUCATION
+  COMEDY
+  NEWS
+  TRAVEL
+  FOOD
+  TECH
+
+  @@map("explore_category")
+}
+
+enum SearchType {
+  ALL
+  USERS
+  POSTS
+  VIDEOS
+  SHORTS
+  HASHTAGS
+
+  @@map("search_type")
+}
+
+enum SavedItemType {
+  POST
+  VIDEO
+  LINK
+
+  @@map("saved_item_type")
+}
+
+enum ActivityType {
+  POST_CREATED
+  POST_LIKED
+  COMMENT_ADDED
+  POST_SHARED
+  USER_FOLLOWED
+  VIDEO_WATCHED
+
+  @@map("activity_type")
+}
+
+enum SupportStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+
+  @@map("support_status")
+}
+
+// ─────────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────────
+
+/// One row of application profile data per Supabase Auth user.
+///
+/// `id` mirrors auth.users(id). That foreign key, plus Row Level Security
+/// and its policies, are defined as raw SQL inside the migration — Prisma
+/// does not own the `auth` schema and has no syntax for RLS, so those live
+/// in the migration file rather than here. See migrations/*_add_profiles.
+model Profile {
+  id                 String              @id @db.Uuid
+  username           String?             @unique @db.VarChar(30)
+  fullName           String?             @map("full_name")
+  bio                String?             @db.VarChar(500)
+  avatarUrl          String?             @map("avatar_url")
+  coverUrl           String?             @map("cover_url")
+  website            String?             @db.VarChar(255)
+  dateOfBirth        DateTime?           @map("date_of_birth") @db.Date
+  gender             Gender?
+  relationshipStatus RelationshipStatus? @map("relationship_status")
+  location           String?             @db.VarChar(255)
+  work               String?             @db.VarChar(255)
+  education          String?             @db.VarChar(255)
+  currentCity        String?             @map("current_city") @db.VarChar(255)
+  hometown           String?             @db.VarChar(255)
+  pinnedPostId       String?             @unique @map("pinned_post_id") @db.Uuid
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lastActiveAt       DateTime?           @map("last_active_at") @db.Timestamptz(6)
+  deletedAt          DateTime?           @map("deleted_at") @db.Timestamptz(6)
+  purgeAfter         DateTime?           @map("purge_after") @db.Timestamptz(6)
+
+  privacySettings ProfilePrivacySettings?
+  pinnedPost      Post?                   @relation("PinnedPost", fields: [pinnedPostId], references: [id], onDelete: SetNull)
+  posts           Post[]                  @relation("AuthorPosts")
+  followers       Follow[]                @relation("Following")
+  following       Follow[]                @relation("Follower")
+  blocksInitiated Block[]                 @relation("Blocker")
+  blocksReceived  Block[]                 @relation("Blocked")
+  notifications   Notification[]          @relation("NotificationRecipient")
+  actedNotifications Notification[]       @relation("NotificationActor")
+  contacts        UserContact[]           @relation("ContactOwner")
+  contactOf       UserContact[]           @relation("ContactUser")
+  accountSettings UserAccountSettings?
+  sessions        UserSession[]
+  searchHistory   SearchHistory[]
+  postLikes       PostLike[]
+  comments        Comment[]
+  commentLikes    CommentLike[]
+  postShares      PostShare[]
+  notificationPreference NotificationPreference?
+  savedItems             SavedItem[]
+  savedCollections       SavedCollection[]
+  activityLog            ActivityLog[]
+  supportReports         SupportReport[]
+
+  @@index([fullName])
+  @@index([location])
+  @@map("profiles")
+}
+
+/// Per-user privacy controls. Created alongside the profile (defaults applied).
+model ProfilePrivacySettings {
+  profileId                String            @id @map("profile_id") @db.Uuid
+  isPrivate                Boolean           @default(false) @map("is_private")
+  postsVisibility          VisibilityLevel   @default(PUBLIC) @map("posts_visibility")
+  messagesFrom             MessagePermission @default(EVERYONE) @map("messages_from")
+  followersListVisibility  VisibilityLevel   @default(PUBLIC) @map("followers_list_visibility")
+  followingListVisibility  VisibilityLevel   @default(PUBLIC) @map("following_list_visibility")
+  createdAt                DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("profile_privacy_settings")
+}
+
+/// Directed follow graph. PENDING rows represent follow requests to private accounts.
+model Follow {
+  id          String       @id @default(uuid()) @db.Uuid
+  followerId  String       @map("follower_id") @db.Uuid
+  followingId String       @map("following_id") @db.Uuid
+  status      FollowStatus @default(ACCEPTED)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  follower  Profile @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following Profile @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId, status])
+  @@index([followingId, status])
+  @@map("follows")
+}
+
+/// Block list — blocked users cannot see profile or content.
+model Block {
+  id        String   @id @default(uuid()) @db.Uuid
+  blockerId String   @map("blocker_id") @db.Uuid
+  blockedId String   @map("blocked_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  blocker Profile @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked Profile @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+  @@map("blocks")
+}
+
+/// User-generated content. Cover photo updates are stored as COVER_PHOTO posts.
+model Post {
+  id              String           @id @default(uuid()) @db.Uuid
+  authorId        String           @map("author_id") @db.Uuid
+  content         String?          @db.Text
+  title           String?          @db.VarChar(255)
+  description     String?          @db.Text
+  postType        PostType         @default(TEXT) @map("post_type")
+  privacy         PostPrivacy      @default(PUBLIC)
+  mediaUrl        String?          @map("media_url")
+  thumbnailUrl    String?          @map("thumbnail_url")
+  isLongFormVideo Boolean          @default(false) @map("is_long_form_video")
+  category        ExploreCategory? @map("category")
+  viewCount       Int              @default(0) @map("view_count")
+  likeCount       Int              @default(0) @map("like_count")
+  commentCount    Int              @default(0) @map("comment_count")
+  shareCount      Int              @default(0) @map("share_count")
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  author    Profile       @relation("AuthorPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  pinnedBy  Profile?      @relation("PinnedPost")
+  hashtags  PostHashtag[]
+  media     PostMedia[]
+  likes     PostLike[]
+  comments  Comment[]
+  shares    PostShare[]
+  savedItems SavedItem[]
+
+  @@index([authorId, createdAt(sort: Desc)])
+  @@index([authorId, isLongFormVideo, createdAt(sort: Desc)])
+  @@index([category, viewCount(sort: Desc)])
+  @@index([viewCount(sort: Desc), createdAt(sort: Desc)])
+  @@map("posts")
+}
+
+/// Ordered photos attached to a post (Facebook-album style).
+model PostMedia {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  url       String
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@map("post_media")
+}
+
+/// Normalized hashtag registry for discovery and search.
+model Hashtag {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(100)
+  postCount Int      @default(0) @map("post_count")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  posts PostHashtag[]
+
+  @@index([name])
+  @@map("hashtags")
+}
+
+/// Many-to-many link between posts and hashtags.
+model PostHashtag {
+  postId    String @map("post_id") @db.Uuid
+  hashtagId String @map("hashtag_id") @db.Uuid
+
+  post    Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  hashtag Hashtag @relation(fields: [hashtagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, hashtagId])
+  @@index([hashtagId])
+  @@map("post_hashtags")
+}
+
+/// Per-user recent search queries (Facebook-style search history).
+model SearchHistory {
+  id         String     @id @default(uuid()) @db.Uuid
+  userId     String     @map("user_id") @db.Uuid
+  query      String     @db.VarChar(255)
+  searchType SearchType @default(ALL) @map("search_type")
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("search_history")
+}
+
+/// Extended account metadata beyond Supabase Auth (phone, security timestamps).
+model UserAccountSettings {
+  profileId               String    @id @map("profile_id") @db.Uuid
+  phone                   String?   @db.VarChar(20)
+  phoneVerifiedAt         DateTime? @map("phone_verified_at") @db.Timestamptz(6)
+  pendingEmail            String?   @map("pending_email") @db.VarChar(255)
+  pendingEmailOtp         String?   @map("pending_email_otp") @db.VarChar(10)
+  pendingEmailOtpExpiresAt DateTime? @map("pending_email_otp_expires_at") @db.Timestamptz(6)
+  pendingPhone            String?   @map("pending_phone") @db.VarChar(20)
+  pendingPhoneOtp         String?   @map("pending_phone_otp") @db.VarChar(10)
+  pendingPhoneOtpExpiresAt DateTime? @map("pending_phone_otp_expires_at") @db.Timestamptz(6)
+  lastPasswordChangeAt    DateTime? @map("last_password_change_at") @db.Timestamptz(6)
+  lastLoginAt             DateTime? @map("last_login_at") @db.Timestamptz(6)
+  lastLoginLocation       String?   @map("last_login_location") @db.VarChar(255)
+  lastLoginDevice         String?   @map("last_login_device") @db.VarChar(255)
+  twoFactorEnabled        Boolean   @default(false) @map("two_factor_enabled")
+  twoFactorMethod         String?   @map("two_factor_method") @db.VarChar(10)
+  pendingTwoFactorOtp     String?   @map("pending_two_factor_otp") @db.VarChar(10)
+  pendingTwoFactorOtpExpiresAt DateTime? @map("pending_two_factor_otp_expires_at") @db.Timestamptz(6)
+  loginAlertsEnabled      Boolean   @default(true) @map("login_alerts_enabled")
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("user_account_settings")
+}
+
+/// Active login sessions for the security settings screen.
+model UserSession {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  deviceName   String   @map("device_name") @db.VarChar(255)
+  userAgent    String?  @map("user_agent") @db.VarChar(500)
+  ipAddress    String?  @map("ip_address") @db.VarChar(45)
+  location     String?  @db.VarChar(255)
+  isCurrent    Boolean  @default(false) @map("is_current")
+  lastActiveAt DateTime @default(now()) @map("last_active_at") @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, lastActiveAt(sort: Desc)])
+  @@map("user_sessions")
+}
+
+/// In-app notifications (follow, follow request, etc.).
+model Notification {
+  id          String           @id @default(uuid()) @db.Uuid
+  recipientId String           @map("recipient_id") @db.Uuid
+  actorId     String           @map("actor_id") @db.Uuid
+  type        NotificationType
+  entityId    String?          @map("entity_id") @db.Uuid
+  message     String?          @db.VarChar(500)
+  isRead      Boolean          @default(false) @map("is_read")
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  recipient Profile @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actor     Profile @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, isRead, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+/// Imported contacts for "people you may know" suggestions.
+model UserContact {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  contactUserId String   @map("contact_user_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        Profile @relation("ContactOwner", fields: [userId], references: [id], onDelete: Cascade)
+  contactUser Profile @relation("ContactUser", fields: [contactUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contactUserId])
+  @@index([userId])
+  @@map("user_contacts")
+}
+
+/// A user's like on a post. Uniqueness prevents duplicate likes.
+model PostLike {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([postId])
+  @@map("post_likes")
+}
+
+/// Top-level comment on a post.
+model Comment {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  content   String   @db.Text
+  likeCount Int      @default(0) @map("like_count")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  post   Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author Profile       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes  CommentLike[]
+
+  @@index([postId, createdAt(sort: Desc)])
+  @@map("comments")
+}
+
+/// A user's like on a comment.
+model CommentLike {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  commentId String   @map("comment_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user    Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@index([commentId])
+  @@map("comment_likes")
+}
+
+/// Records that a user shared a post (increments share_count on the post).
+model PostShare {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId, postId])
+  @@map("post_shares")
+}
+
+/// Per-user notification delivery preferences (one row per profile).
+model NotificationPreference {
+  profileId            String   @id @map("profile_id") @db.Uuid
+  comments             Boolean  @default(true)
+  tags                 Boolean  @default(true)
+  reminders            Boolean  @default(false)
+  moreActivityAboutYou Boolean  @default(true) @map("more_activity_about_you")
+  updatesFromFriends   Boolean  @default(true) @map("updates_from_friends")
+  pushEnabled          Boolean  @default(true) @map("push_enabled")
+  emailEnabled         Boolean  @default(false) @map("email_enabled")
+  smsEnabled           Boolean  @default(false) @map("sms_enabled")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+/// Named buckets a user can organize saved items into.
+model SavedCollection {
+  id          String      @id @default(uuid()) @db.Uuid
+  userId      String      @map("user_id") @db.Uuid
+  name        String      @db.VarChar(100)
+  description String?     @db.VarChar(500)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user  Profile     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items SavedItem[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("saved_collections")
+}
+
+/// A saved post, video, or external link, optionally filed in a collection.
+model SavedItem {
+  id               String        @id @default(uuid()) @db.Uuid
+  userId           String        @map("user_id") @db.Uuid
+  type             SavedItemType
+  postId           String?       @map("post_id") @db.Uuid
+  linkUrl          String?       @map("link_url")
+  linkTitle        String?       @map("link_title") @db.VarChar(255)
+  linkThumbnailUrl String?       @map("link_thumbnail_url")
+  collectionId     String?       @map("collection_id") @db.Uuid
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user       Profile          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post       Post?            @relation(fields: [postId], references: [id], onDelete: Cascade)
+  collection SavedCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, postId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("saved_items")
+}
+
+/// Append-only feed of a user's own activity (posts, likes, follows, etc.).
+model ActivityLog {
+  id         String       @id @default(uuid()) @db.Uuid
+  userId     String       @map("user_id") @db.Uuid
+  type       ActivityType
+  entityId   String?      @map("entity_id") @db.Uuid
+  entityType String?      @map("entity_type") @db.VarChar(30)
+  metadata   Json?
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("activity_log")
+}
+
+/// User-submitted support / abuse reports with admin response tracking.
+model SupportReport {
+  id            String        @id @default(uuid()) @db.Uuid
+  userId        String        @map("user_id") @db.Uuid
+  subject       String?       @db.VarChar(200)
+  category      String?       @db.VarChar(50)
+  description   String        @db.Text
+  status        SupportStatus @default(OPEN)
+  adminResponse String?       @map("admin_response") @db.Text
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("support_reports")
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+
+  @@map("admin_role")
+}
+
+enum AdminStatus {
+  ACTIVE
+  SUSPENDED
+
+  @@map("admin_status")
+}
+
+/// Admin-panel identity — fully independent of end-user Supabase auth.
+model AdminUser {
+  id           String      @id @default(uuid()) @db.Uuid
+  email        String      @unique @db.VarChar(255)
+  passwordHash String      @map("password_hash")
+  fullName     String      @map("full_name")
+  role         AdminRole   @default(MODERATOR)
+  status       AdminStatus @default(ACTIVE)
+  lastActiveAt DateTime?   @map("last_active_at") @db.Timestamptz(6)
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  auditLogs    AdminAuditLog[]
+
+  @@map("admin_users")
+}
+
+/// Append-only audit trail of admin actions (login, logout, moderation, …).
+model AdminAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  adminId    String   @map("admin_id") @db.Uuid
+  action     String   @db.VarChar(100)
+  targetType String?  @map("target_type") @db.VarChar(50)
+  targetId   String?  @map("target_id")
+  metadata   Json?
+  ipAddress  String?  @map("ip_address") @db.VarChar(45)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  admin      AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId, createdAt(sort: Desc)])
+  @@map("admin_audit_logs")
+}

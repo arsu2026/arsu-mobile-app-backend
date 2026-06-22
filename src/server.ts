@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import 'source-map-support/register';
 import { createApp } from './app';
 import { env } from './config/env.config';

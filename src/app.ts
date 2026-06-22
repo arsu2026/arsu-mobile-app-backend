@@ -15,6 +15,7 @@ import { errorHandler } from './common/middleware/error-handler.middleware';
 import { notFoundHandler } from './common/middleware/not-found.middleware';
 import { requestIdMiddleware } from './common/middleware/request-id.middleware';
 import { configurePassport } from './config/passport.config';
+import { setupSwagger } from './config/swagger.config';
 import router from './routes';
 
 export function createApp(): Application {
@@ -57,6 +58,9 @@ export function createApp(): Application {
       timestamp: new Date().toISOString(),
     });
   });
+
+  // ── API Docs (Swagger UI) ────────────────────────────────────────────────
+  setupSwagger(app);
 
   // ── API Routes ───────────────────────────────────────────────────────────
   app.use(`/${env.API_PREFIX}`, router);

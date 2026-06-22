@@ -38,3 +38,9 @@ coverage/
 
 # TypeScript incremental compilation
 *.tsbuildinfo
+
+graphify-out
+CLAUDE.md
+.agents
+.claude
+skills-lock.json
