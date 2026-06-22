@@ -1,6 +1,11 @@
 import 'reflect-metadata';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-require('source-map-support').install();
+// source-map-support improves stack traces; optional — server must not crash if absent
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('source-map-support').install();
+} catch {
+  // not available in this environment — continue without it
+}
 import { createApp } from './app';
 import { env } from './config/env.config';
 import { logger } from './common/utils/logger';
