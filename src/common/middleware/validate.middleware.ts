@@ -53,7 +53,14 @@ export function validateQuery<T extends object>(DtoClass: new () => T) {
       return next(new UnprocessableEntityError('Query validation failed', formatted));
     }
 
-    req.query = instance as any;
+    // Express 5 exposes req.query as a getter-only property — mutate in place
+    // instead of reassigning req.query (which throws in Express 5 / supertest).
+    const query = req.query as Record<string, unknown>;
+    for (const key of Object.keys(query)) {
+      delete query[key];
+    }
+    Object.assign(query, instance as Record<string, unknown>);
+
     next();
   };
 }

@@ -1,9 +1,10 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Load .env.local first (local dev), fall back to .env
-const envFile = process.env.NODE_ENV === 'test' ? '.env.test' : '.env.local';
-dotenv.config({ path: path.resolve(process.cwd(), envFile) });
+// Load variables from a single local .env file (gitignored). .env.example
+// documents the required variables. Tests don't depend on any file:
+// test/jest.setup-env.ts sets process.env before this runs, and dotenv never
+// overrides already-set variables, so the suite stays hermetic.
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 function requireEnv(key: string): string {
@@ -30,7 +31,7 @@ export const env = {
 
   // Database
   DATABASE_URL: requireEnv('DATABASE_URL'),
-  DIRECT_URL: requireEnv('DIRECT_URL'),
+  DATABASE_DIRECT_URL: requireEnv('DATABASE_DIRECT_URL'),
 
   // JWT
   JWT_SECRET: requireEnv('JWT_SECRET'),
@@ -38,10 +39,18 @@ export const env = {
   JWT_REFRESH_SECRET: requireEnv('JWT_REFRESH_SECRET'),
   JWT_REFRESH_EXPIRES_IN: optionalEnv('JWT_REFRESH_EXPIRES_IN', '30d'),
 
+  // Admin auth (dedicated — independent of end-user JWT_SECRET)
+  ADMIN_JWT_SECRET: requireEnv('ADMIN_JWT_SECRET'),
+  ADMIN_JWT_EXPIRES_IN: optionalEnv('ADMIN_JWT_EXPIRES_IN', '1d'),
+  ADMIN_SEED_EMAIL: optionalEnv('ADMIN_SEED_EMAIL', ''),
+  ADMIN_SEED_PASSWORD: optionalEnv('ADMIN_SEED_PASSWORD', ''),
+  ADMIN_SEED_NAME: optionalEnv('ADMIN_SEED_NAME', 'Super Admin'),
+
   // Supabase
   SUPABASE_URL: requireEnv('SUPABASE_URL'),
   SUPABASE_ANON_KEY: requireEnv('SUPABASE_ANON_KEY'),
   SUPABASE_SERVICE_ROLE_KEY: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
+  SUPABASE_POST_MEDIA_BUCKET: optionalEnv('SUPABASE_POST_MEDIA_BUCKET', 'post-media'),
 
   // Session
   SESSION_SECRET: requireEnv('SESSION_SECRET'),

@@ -3,9 +3,14 @@
   "compilerOptions": {
     "module": "Node16",
     "moduleResolution": "node16",
+<<<<<<< HEAD
     "rootDir": "./src",
     "outDir": "./dist"
+=======
+    "outDir": "./dist",
+    "rootDir": "./src"
+>>>>>>> 4770626bc98056709e6420374aca6e0b87861ae9
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "coverage", "**/*.spec.ts", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "coverage", "**/*.spec.ts", "**/*.test.ts", "**/__mocks__/**"]
 }
