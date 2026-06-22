@@ -59,6 +59,13 @@ const swaggerDefinition: swaggerJSDoc.OAS3Definition = {
       name: 'Post',
       description: 'Create, edit, delete, and read posts, including multi-photo uploads',
     },
+    {
+      name: 'Admin · Auth',
+      description:
+        'Admin-panel authentication. Uses a dedicated AdminUser identity, fully ' +
+        'separate from end-user Supabase auth and signed with the admin JWT secret. ' +
+        'Powers the moderation console login, session check, and logout.',
+    },
   ],
   components: {
     securitySchemes: {
@@ -67,6 +74,14 @@ const swaggerDefinition: swaggerJSDoc.OAS3Definition = {
         scheme: 'bearer',
         bearerFormat: 'JWT',
         description: 'Supabase access token returned from login/signup',
+      },
+      adminBearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description:
+          'Admin-panel JWT returned from POST /admin/auth/login (signed with ' +
+          'ADMIN_JWT_SECRET). Distinct from the user-facing Supabase token above.',
       },
     },
     schemas: {
@@ -237,6 +252,8 @@ const swaggerDefinition: swaggerJSDoc.OAS3Definition = {
           'TECH',
         ],
       },
+      AdminRole: { type: 'string', enum: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'] },
+      AdminStatus: { type: 'string', enum: ['ACTIVE', 'SUSPENDED'] },
 
       // ── Profile models ────────────────────────────────────────────────────
       BasicUserInfo: {
@@ -630,6 +647,70 @@ const swaggerDefinition: swaggerJSDoc.OAS3Definition = {
           content: { type: 'string', maxLength: 5000 },
           privacy: { $ref: '#/components/schemas/PostPrivacy' },
           category: { $ref: '#/components/schemas/ExploreCategory' },
+        },
+      },
+
+      // ── Admin · Auth ──────────────────────────────────────────────────────
+      AdminView: {
+        type: 'object',
+        description: 'API-facing admin identity; timestamps are ISO 8601 strings.',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          email: { type: 'string', format: 'email', example: 'admin@arsu.app' },
+          fullName: { type: 'string', example: 'Super Admin' },
+          role: { $ref: '#/components/schemas/AdminRole' },
+          status: { $ref: '#/components/schemas/AdminStatus' },
+          lastActiveAt: { type: 'string', format: 'date-time', nullable: true },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      AdminLoginRequest: {
+        type: 'object',
+        required: ['email', 'password'],
+        properties: {
+          email: { type: 'string', format: 'email', example: 'admin@arsu.app' },
+          password: {
+            type: 'string',
+            format: 'password',
+            minLength: 8,
+            maxLength: 200,
+            example: 'ChangeMe123!',
+          },
+        },
+      },
+      AdminLoginResponse: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: true },
+          message: { type: 'string', example: 'Logged in' },
+          data: {
+            type: 'object',
+            properties: {
+              token: {
+                type: 'string',
+                description: 'Admin JWT — send as a `Bearer` token on subsequent admin requests.',
+              },
+              admin: { $ref: '#/components/schemas/AdminView' },
+            },
+          },
+        },
+      },
+      AdminMeResponse: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: true },
+          data: { $ref: '#/components/schemas/AdminView' },
+        },
+      },
+      AdminLogoutResponse: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: true },
+          message: { type: 'string', example: 'Logged out' },
+          data: {
+            type: 'object',
+            properties: { success: { type: 'boolean', example: true } },
+          },
         },
       },
     },

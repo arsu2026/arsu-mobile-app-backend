@@ -8,6 +8,8 @@ declare global {
     interface Request {
       // Raw Supabase access token, set by supabaseAuthGuard after verification
       accessToken?: string;
+      // Authenticated admin identity, set by requireAdmin
+      admin?: import('../modules/admin/auth/admin-auth.types').AdminPrincipal;
     }
   }
 }
