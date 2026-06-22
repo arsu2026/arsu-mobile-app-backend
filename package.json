@@ -43,7 +43,8 @@
   },
   "keywords": ["nodejs", "express", "prisma", "supabase", "postgresql", "typescript"],
   "dependencies": {
-    "@prisma/client": "^6.17.1",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
     "@supabase/supabase-js": "^2.108.1",
     "axios": "^1.17.0",
     "bcryptjs": "^3.0.3",
@@ -63,6 +64,7 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
+    "pg": "^8.16.3",
     "rxjs": "^7.8.2",
     "uuid": "^14.0.0"
   },
@@ -93,7 +95,8 @@
     "jest": "^30.4.2",
     "nodemon": "^3.1.14",
     "prettier": "^3.8.4",
-    "prisma": "^6.17.1",
+    "@types/pg": "^8.11.14",
+    "prisma": "^7.8.0",
     "source-map-support": "^0.5.21",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.11",
