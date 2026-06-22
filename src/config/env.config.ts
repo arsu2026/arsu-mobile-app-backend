@@ -39,6 +39,13 @@ export const env = {
   JWT_REFRESH_SECRET: requireEnv('JWT_REFRESH_SECRET'),
   JWT_REFRESH_EXPIRES_IN: optionalEnv('JWT_REFRESH_EXPIRES_IN', '30d'),
 
+  // Admin auth (dedicated — independent of end-user JWT_SECRET)
+  ADMIN_JWT_SECRET: requireEnv('ADMIN_JWT_SECRET'),
+  ADMIN_JWT_EXPIRES_IN: optionalEnv('ADMIN_JWT_EXPIRES_IN', '1d'),
+  ADMIN_SEED_EMAIL: optionalEnv('ADMIN_SEED_EMAIL', ''),
+  ADMIN_SEED_PASSWORD: optionalEnv('ADMIN_SEED_PASSWORD', ''),
+  ADMIN_SEED_NAME: optionalEnv('ADMIN_SEED_NAME', 'Super Admin'),
+
   // Supabase
   SUPABASE_URL: requireEnv('SUPABASE_URL'),
   SUPABASE_ANON_KEY: requireEnv('SUPABASE_ANON_KEY'),
