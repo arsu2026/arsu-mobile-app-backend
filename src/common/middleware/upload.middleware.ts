@@ -22,10 +22,11 @@ export function uploadPostImages(req: Request, res: Response, next: NextFunction
   upload.array('images', MAX_FILES)(req, res, (err: unknown) => {
     if (err) {
       if (err instanceof multer.MulterError) {
+        const multerErr = err as multer.MulterError;
         const message =
-          err.code === 'LIMIT_FILE_SIZE'
+          multerErr.code === 'LIMIT_FILE_SIZE'
             ? 'Each image must be 5 MB or smaller'
-            : err.code === 'LIMIT_FILE_COUNT'
+            : multerErr.code === 'LIMIT_FILE_COUNT'
               ? `You can upload at most ${MAX_FILES} images`
               : 'Image upload failed';
         return next(new BadRequestError(message));
@@ -41,8 +42,9 @@ function handleSingleUpload(fieldName: string) {
     upload.single(fieldName)(req, res, (err: unknown) => {
       if (err) {
         if (err instanceof multer.MulterError) {
+          const multerErr = err as multer.MulterError;
           const message =
-            err.code === 'LIMIT_FILE_SIZE'
+            multerErr.code === 'LIMIT_FILE_SIZE'
               ? 'Image must be 5 MB or smaller'
               : 'Image upload failed';
           return next(new BadRequestError(message));

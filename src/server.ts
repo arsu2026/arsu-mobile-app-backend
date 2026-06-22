@@ -1,5 +1,6 @@
 import 'reflect-metadata';
-import 'source-map-support/register';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+require('source-map-support').install();
 import { createApp } from './app';
 import { env } from './config/env.config';
 import { logger } from './common/utils/logger';

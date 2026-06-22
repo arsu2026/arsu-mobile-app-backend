@@ -6,6 +6,9 @@ import type { CreatePostDto } from './dto/create-post.dto';
 import type { UpdatePostDto } from './dto/update-post.dto';
 import * as postService from './post.service';
 
+/** Minimal shape of a multer-uploaded file (avoids Express.Multer.File global issues). */
+type UploadedFile = { buffer: Buffer; mimetype: string };
+
 function requireUserId(req: Request): string {
   if (!req.user?.sub) throw new UnauthorizedError('Authentication required');
   return req.user.sub;
@@ -23,7 +26,7 @@ function param(req: Request, name: string): string {
 export async function createPost(req: Request, res: Response): Promise<void> {
   const userId = requireUserId(req);
   const body = req.body as CreatePostDto;
-  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+  const files = (req.files as UploadedFile[] | undefined) ?? [];
 
   const post = await postService.createPost(userId, {
     content: body.content,
