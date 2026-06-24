@@ -32,11 +32,12 @@ export function createApp(): Application {
   //      (avoids preflights being rate-limited or rejected by helmet).
   //   2. All error responses produced by downstream middleware still carry the
   //      correct Access-Control-* headers so the browser can read the body.
+  //
+  // NOTE: We intentionally do NOT add app.options('*', ...) here. Express 5
+  // uses path-to-regexp v8 which rejects bare '*' and crashes the process at
+  // startup. The cors() middleware registered via app.use() already intercepts
+  // all OPTIONS preflight requests automatically when preflightContinue is false.
   app.use(cors(corsOptions));
-
-  // Explicitly handle all OPTIONS preflight requests globally so they resolve
-  // in a single round-trip without touching any route handler.
-  app.options('*', cors(corsOptions));
 
   // ── Security headers ──────────────────────────────────────────────────────
   // Helmet is configured to be API-friendly:
