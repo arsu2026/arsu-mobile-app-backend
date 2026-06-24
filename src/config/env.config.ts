@@ -68,7 +68,13 @@ export const env = {
   THROTTLE_LIMIT: parseInt(optionalEnv('THROTTLE_LIMIT', '100'), 10),
 
   // CORS
-  ALLOWED_ORIGINS: optionalEnv('ALLOWED_ORIGINS', 'http://localhost:3000').split(','),
+  // In development the cors.config.ts allows all origins; this list is only
+  // enforced in production/staging.  Provide a comma-separated list of the
+  // domains your Flutter web build and any web dashboard are served from.
+  ALLOWED_ORIGINS: optionalEnv(
+    'ALLOWED_ORIGINS',
+    'http://localhost:3000,http://localhost:10000,http://localhost:8080,http://10.0.2.2:3000,http://10.0.2.2:10000,http://127.0.0.1:3000,http://127.0.0.1:10000',
+  ).split(',').map((o) => o.trim()).filter(Boolean),
 } as const;
 
 export type Env = typeof env;

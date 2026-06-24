@@ -21,9 +21,36 @@ import router from './routes';
 export function createApp(): Application {
   const app = express();
 
-  // ── Security ──────────────────────────────────────────────────────────────
-  app.use(helmet());
+  // ── Trust proxy (required when running behind Render / Nginx / load-balancer)
+  // Lets Express read the real client IP from X-Forwarded-For so rate-limiting
+  // works correctly and HTTPS is detected properly.
+  app.set('trust proxy', 1);
+
+  // ── CORS — must come FIRST, before helmet and rate-limiter ────────────────
+  // Registering cors() early ensures that:
+  //   1. OPTIONS preflight responses are sent before any other middleware runs
+  //      (avoids preflights being rate-limited or rejected by helmet).
+  //   2. All error responses produced by downstream middleware still carry the
+  //      correct Access-Control-* headers so the browser can read the body.
   app.use(cors(corsOptions));
+
+  // Explicitly handle all OPTIONS preflight requests globally so they resolve
+  // in a single round-trip without touching any route handler.
+  app.options('*', cors(corsOptions));
+
+  // ── Security headers ──────────────────────────────────────────────────────
+  // Helmet is configured to be API-friendly:
+  //   • contentSecurityPolicy disabled  — CSP is only relevant for HTML pages;
+  //     an API that returns JSON has no document context.
+  //   • crossOriginResourcePolicy set to cross-origin — allows browsers and
+  //     Flutter web builds to consume API responses from a different origin.
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      crossOriginOpenerPolicy: false,
+    }),
+  );
 
   // ── Rate Limiting ─────────────────────────────────────────────────────────
   app.use(rateLimit(rateLimitConfig));
