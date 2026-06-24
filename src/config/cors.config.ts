@@ -70,6 +70,15 @@ export const corsOptions: CorsOptions = {
       return callback(null, true);
     }
 
+    // ── Localhost / 127.0.0.1 / 10.0.2.2 — always allowed regardless of port ──
+    // Flutter web dev server picks a random ephemeral port on every run, so
+    // a fixed-port allowlist would never match.  These origins are only reachable
+    // on the developer's own machine, so there is no meaningful security risk.
+    const localhostPattern = /^https?:\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2)(:\d+)?$/;
+    if (localhostPattern.test(origin)) {
+      return callback(null, true);
+    }
+
     // ── Production / staging: explicit allowlist ───────────────────────────────
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
